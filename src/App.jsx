@@ -129,55 +129,37 @@ const formatName = (name) =>
   name?.split(" ").map(w => w.charAt(0) + w.slice(1).toLowerCase()).join(" ") || "";
 
 // ─── LOGO SVG ORINET ──────────────────────────────────────────────────────
-// Replica el estilo de la imagen: texto multicolor + globo de conectividad
 function OriNetLogo({ size = "large" }) {
   const isLarge = size === "large";
-  const textSize  = isLarge ? 52 : 28;
-  const globeSize = isLarge ? 54 : 30;
-  const tagSize   = isLarge ? 14 : 0;
-  const gap       = isLarge ? 8 : 5;
-  const totalW    = isLarge ? 320 : 180;
-  const totalH    = isLarge ? 80 : 44;
+
+  // Versión grande: login — Versión pequeña: header
+  const fontSize   = isLarge ? 56 : 30;
+  const tagSize    = 13;
+  const width      = isLarge ? 220 : 118;
+  const textY      = isLarge ? 58 : 32;
 
   return (
     <svg
-      width={totalW}
-      height={isLarge ? totalH + (tagSize ? 28 : 0) : totalH}
-      viewBox={`0 0 ${totalW} ${isLarge ? totalH + (tagSize ? 28 : 0) : totalH}`}
+      width={width}
+      height={isLarge ? textY + (isLarge ? 28 : 0) : textY + 4}
+      viewBox={`0 0 ${width} ${isLarge ? textY + 28 : textY + 4}`}
       xmlns="http://www.w3.org/2000/svg"
     >
       <defs>
-        {/* Gradiente multicolor para el texto — igual que el logo real */}
         <linearGradient id="textGrad" x1="0%" y1="0%" x2="100%" y2="0%">
           <stop offset="0%"   stopColor="#a855f7" />
-          <stop offset="18%"  stopColor="#ec4899" />
-          <stop offset="38%"  stopColor="#f97316" />
-          <stop offset="55%"  stopColor="#eab308" />
-          <stop offset="72%"  stopColor="#22d3ee" />
+          <stop offset="20%"  stopColor="#ec4899" />
+          <stop offset="42%"  stopColor="#f97316" />
+          <stop offset="60%"  stopColor="#eab308" />
+          <stop offset="82%"  stopColor="#22d3ee" />
           <stop offset="100%" stopColor="#22d3ee" />
         </linearGradient>
-        {/* Gradiente del globo — verde/cyan como en el logo */}
-        <linearGradient id="globeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%"   stopColor="#22d3ee" />
-          <stop offset="50%"  stopColor="#10b981" />
-          <stop offset="100%" stopColor="#16a34a" />
-        </linearGradient>
-        {/* Gradiente del tagline */}
         <linearGradient id="tagGrad" x1="0%" y1="0%" x2="100%" y2="0%">
           <stop offset="0%"   stopColor="#e2e8f0" />
           <stop offset="100%" stopColor="#94a3b8" />
         </linearGradient>
-        {/* Sombra glow para el texto */}
-        <filter id="textGlow" x="-10%" y="-30%" width="120%" height="160%">
-          <feGaussianBlur stdDeviation="3" result="blur"/>
-          <feMerge>
-            <feMergeNode in="blur"/>
-            <feMergeNode in="SourceGraphic"/>
-          </feMerge>
-        </filter>
-        {/* Sombra glow para el globo */}
-        <filter id="globeGlow" x="-20%" y="-20%" width="140%" height="140%">
-          <feGaussianBlur stdDeviation="4" result="blur"/>
+        <filter id="textGlow" x="-5%" y="-20%" width="110%" height="140%">
+          <feGaussianBlur stdDeviation="2.5" result="blur"/>
           <feMerge>
             <feMergeNode in="blur"/>
             <feMergeNode in="SourceGraphic"/>
@@ -185,12 +167,13 @@ function OriNetLogo({ size = "large" }) {
         </filter>
       </defs>
 
-      {/* Texto "OriNet" con gradiente multicolor */}
+      {/* Texto "OriNet" centrado con gradiente */}
       <text
-        x="0"
-        y={isLarge ? 68 : 36}
+        x={width / 2}
+        y={textY}
+        textAnchor="middle"
         fontFamily="'Outfit', 'Segoe UI', sans-serif"
-        fontSize={textSize}
+        fontSize={fontSize}
         fontWeight="800"
         fill="url(#textGrad)"
         filter="url(#textGlow)"
@@ -199,65 +182,17 @@ function OriNetLogo({ size = "large" }) {
         OriNet
       </text>
 
-      {/* Globo de conectividad — SVG inline */}
-      <g transform={`translate(${isLarge ? 244 : 138}, ${isLarge ? 8 : 4})`} filter="url(#globeGlow)">
-        {/* Esfera base */}
-        <circle cx={globeSize / 2} cy={globeSize / 2} r={globeSize / 2} fill="url(#globeGrad)" opacity="0.95"/>
-        {/* Líneas horizontales de latitud — estilo "globo" */}
-        {[0.28, 0.5, 0.72].map((t, i) => {
-          const y = globeSize * t;
-          const hw = Math.sqrt(Math.pow(globeSize / 2, 2) - Math.pow(y - globeSize / 2, 2)) * 0.9;
-          return (
-            <line
-              key={i}
-              x1={globeSize / 2 - hw}
-              y1={y}
-              x2={globeSize / 2 + hw}
-              y2={y}
-              stroke="rgba(0,30,20,0.35)"
-              strokeWidth={isLarge ? 2.5 : 1.5}
-            />
-          );
-        })}
-        {/* Líneas verticales de longitud */}
-        {[-0.32, 0, 0.32].map((offset, i) => {
-          const cx = globeSize / 2 + offset * globeSize;
-          const ry = globeSize / 2;
-          const rx = Math.abs(Math.sqrt(Math.pow(globeSize / 2, 2) - Math.pow(offset * globeSize, 2))) * 0.55;
-          if (rx < 1) return null;
-          return (
-            <ellipse
-              key={i}
-              cx={cx}
-              cy={globeSize / 2}
-              rx={rx}
-              ry={ry * 0.88}
-              fill="none"
-              stroke="rgba(0,30,20,0.3)"
-              strokeWidth={isLarge ? 2 : 1.2}
-            />
-          );
-        })}
-        {/* Brillo superior */}
-        <ellipse
-          cx={globeSize * 0.38}
-          cy={globeSize * 0.28}
-          rx={globeSize * 0.22}
-          ry={globeSize * 0.14}
-          fill="rgba(255,255,255,0.28)"
-        />
-      </g>
-
-      {/* Tagline "Tu Servicio de Internet" — solo en versión grande */}
+      {/* Tagline solo en versión grande */}
       {isLarge && (
         <text
-          x="2"
-          y={totalH + 20}
+          x={width / 2}
+          y={textY + 22}
+          textAnchor="middle"
           fontFamily="'Outfit', 'Segoe UI', sans-serif"
           fontSize={tagSize}
           fontWeight="400"
           fill="url(#tagGrad)"
-          letterSpacing="0.5"
+          letterSpacing="1"
         >
           Tu Servicio de Internet
         </text>
@@ -494,12 +429,12 @@ function ProfileScreen({ customer, onLogout }) {
         </button>
       </div>
 
-      <div className="profile-content" style={{ maxWidth: 560, margin: "0 auto", padding: "36px 20px 0" }}>
+      <div className="profile-content" style={{ maxWidth: 1100, margin: "0 auto", padding: "36px 28px 60px" }}>
 
         {/* Saludo */}
-        <div style={{ marginBottom: 24, animation: "fadeUp 0.4s ease" }}>
+        <div style={{ marginBottom: 28, animation: "fadeUp 0.4s ease" }}>
           <p style={{ margin: "0 0 2px", color: "#475569", fontSize: 14 }}>Bienvenido/a,</p>
-          <h2 style={{ margin: 0, color: "#f8fafc", fontSize: 26, fontWeight: 800, letterSpacing: "-0.5px" }}>
+          <h2 style={{ margin: 0, color: "#f8fafc", fontSize: 28, fontWeight: 800, letterSpacing: "-0.5px" }}>
             {formatName(customer.name)}
           </h2>
           <p style={{ margin: "6px 0 0", color: "#334155", fontSize: 13 }}>
@@ -507,250 +442,254 @@ function ProfileScreen({ customer, onLogout }) {
           </p>
         </div>
 
-        {/* ── DEUDA ── */}
-        <div style={{
-          background: "rgba(255,255,255,0.04)", backdropFilter: "blur(12px)",
-          border: `1px solid ${debtColor}40`, borderRadius: 24,
-          padding: "36px 28px", marginBottom: 14, textAlign: "center",
-          boxShadow: `0 0 60px ${debtColor}15`,
-          animation: "fadeUp 0.5s ease 0.1s both",
-        }}>
-          <p style={{ margin: "0 0 10px", color: "#475569", fontSize: 11, fontWeight: 700, letterSpacing: 2.5, textTransform: "uppercase" }}>
-            Saldo a abonar
-          </p>
-          <div className="debt-amount" style={{
-            fontSize: 68, fontWeight: 800, color: debtColor,
-            letterSpacing: "-3px", lineHeight: 1,
-            textShadow: `0 0 40px ${debtColor}40`,
-          }}>
-            {formatMoney(debt)}
-          </div>
-          <div style={{
-            display: "inline-block", marginTop: 14,
-            background: debtBg, color: debtColor,
-            borderRadius: 99, padding: "6px 20px", fontSize: 13, fontWeight: 600,
-          }}>
-            {!hasDebt ? "✓ ¡Estás al día! Sin deuda pendiente." : "⚠ Tenés un saldo pendiente de pago."}
-          </div>
-          {dueDebt > 0 && (
+        {/* ── GRID DOS COLUMNAS EN PC ── */}
+        <div className="profile-grid">
+
+          {/* COLUMNA IZQUIERDA */}
+          <div className="profile-col">
+
+            {/* ── DEUDA ── */}
             <div style={{
-              marginTop: 18, paddingTop: 18, borderTop: "1px solid rgba(255,255,255,0.07)",
-              display: "flex", justifyContent: "center", gap: 10, alignItems: "center",
+              background: "rgba(255,255,255,0.04)", backdropFilter: "blur(12px)",
+              border: `1px solid ${debtColor}40`, borderRadius: 24,
+              padding: "36px 28px", marginBottom: 14, textAlign: "center",
+              boxShadow: `0 0 60px ${debtColor}15`,
+              animation: "fadeUp 0.5s ease 0.1s both",
             }}>
-              <span style={{ color: "#475569", fontSize: 14 }}>Del cual, deuda vencida:</span>
-              <span style={{ color: "#f87171", fontWeight: 800, fontSize: 16 }}>{formatMoney(dueDebt)}</span>
-            </div>
-          )}
-        </div>
-
-        {/* ── AVISO COMPROBANTE ── */}
-        {hasDebt && (
-          <div style={{
-            background: "linear-gradient(135deg, rgba(16,185,129,0.1), rgba(16,185,129,0.05))",
-            border: "1.5px solid rgba(16,185,129,0.3)",
-            borderRadius: 20, padding: "22px", marginBottom: 14,
-            animation: "fadeUp 0.5s ease 0.15s both",
-          }}>
-            <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
+              <p style={{ margin: "0 0 10px", color: "#475569", fontSize: 11, fontWeight: 700, letterSpacing: 2.5, textTransform: "uppercase" }}>
+                Saldo a abonar
+              </p>
+              <div className="debt-amount" style={{
+                fontSize: 68, fontWeight: 800, color: debtColor,
+                letterSpacing: "-3px", lineHeight: 1,
+                textShadow: `0 0 40px ${debtColor}40`,
+              }}>
+                {formatMoney(debt)}
+              </div>
               <div style={{
-                width: 46, height: 46, borderRadius: 13, flexShrink: 0,
-                background: "rgba(16,185,129,0.15)",
-                display: "flex", alignItems: "center", justifyContent: "center", color: "#10b981",
+                display: "inline-block", marginTop: 14,
+                background: debtBg, color: debtColor,
+                borderRadius: 99, padding: "6px 20px", fontSize: 13, fontWeight: 600,
               }}>
-                <WhatsAppIcon size={24} />
+                {!hasDebt ? "✓ ¡Estás al día! Sin deuda pendiente." : "⚠ Tenés un saldo pendiente de pago."}
               </div>
-              <div style={{ flex: 1 }}>
-                <p style={{ margin: "0 0 5px", color: "#10b981", fontWeight: 800, fontSize: 15 }}>
-                  ⚠️ Una vez pagado, enviá el comprobante
-                </p>
-                <p style={{ margin: "0 0 14px", color: "#6ee7b7", fontSize: 13, lineHeight: 1.6 }}>
-                  Después de realizar el pago, <strong>enviá el comprobante a administración por WhatsApp</strong> para que podamos acreditarlo a la brevedad.
-                </p>
-                <a
-                  href={WHATSAPP_URL(wpPaymentMsg)}
-                  target="_blank" rel="noopener noreferrer"
-                  style={{
-                    display: "inline-flex", alignItems: "center", gap: 9,
-                    background: "linear-gradient(135deg, #25d366, #128c7e)",
-                    color: "#fff", borderRadius: 11, padding: "11px 20px",
-                    fontWeight: 700, fontSize: 14, textDecoration: "none", fontFamily: "inherit",
-                    boxShadow: "0 4px 16px rgba(37,211,102,0.3)",
-                    transition: "opacity 0.2s",
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.opacity = "0.88"}
-                  onMouseLeave={e => e.currentTarget.style.opacity = "1"}
-                >
-                  <WhatsAppIcon size={18} /> Enviar comprobante de pago
-                </a>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ── ESTADO DEL SERVICIO ── */}
-        <div className="status-card" style={{
-          background: "rgba(255,255,255,0.04)", backdropFilter: "blur(12px)",
-          border: `1px solid ${svcStatus.color}30`, borderRadius: 20,
-          padding: "20px 24px", marginBottom: 14,
-          animation: "fadeUp 0.5s ease 0.18s both",
-          display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 14,
-        }}>
-          <div>
-            <p style={{ margin: "0 0 4px", color: "#475569", fontSize: 11, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase" }}>
-              Estado del servicio
-            </p>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{
-                display: "inline-flex", alignItems: "center", gap: 6,
-                background: svcStatus.bg, color: svcStatus.color,
-                borderRadius: 99, padding: "5px 14px", fontSize: 14, fontWeight: 700,
-              }}>
-                <span style={{ fontSize: 10 }}>●</span> {svcStatus.label}
-              </span>
-            </div>
-          </div>
-          <div style={{ textAlign: "right" }}>
-            <p style={{ margin: "0 0 2px", color: "#475569", fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase" }}>
-              Próxima fecha de corte
-            </p>
-            <p style={{ margin: 0, color: "#cbd5e1", fontSize: 14, fontWeight: 600 }}>
-              📅 {cutoffDate}
-            </p>
-          </div>
-        </div>
-
-        {/* ── CBU / ALIAS ── */}
-        <div style={{
-          background: "rgba(255,255,255,0.04)", backdropFilter: "blur(12px)",
-          border: "1px solid rgba(255,255,255,0.08)", borderRadius: 20,
-          padding: "20px 24px", marginBottom: 14,
-          animation: "fadeUp 0.5s ease 0.22s both",
-        }}>
-          <p style={{ margin: "0 0 14px", color: "#f8fafc", fontWeight: 700, fontSize: 15 }}>
-            💳 Datos para el pago
-          </p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {cbu && (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
-                <div>
-                  <span style={{ color: "#475569", fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1 }}>CBU</span>
-                  <p style={{ margin: "2px 0 0", color: "#94a3b8", fontSize: 13, fontFamily: "monospace", letterSpacing: "1px" }}>{cbu}</p>
+              {dueDebt > 0 && (
+                <div style={{
+                  marginTop: 18, paddingTop: 18, borderTop: "1px solid rgba(255,255,255,0.07)",
+                  display: "flex", justifyContent: "center", gap: 10, alignItems: "center",
+                }}>
+                  <span style={{ color: "#475569", fontSize: 14 }}>Del cual, deuda vencida:</span>
+                  <span style={{ color: "#f87171", fontWeight: 800, fontSize: 16 }}>{formatMoney(dueDebt)}</span>
                 </div>
-                <button
-                  onClick={() => handleCopy(cbu, "cbu")}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 7, flexShrink: 0,
-                    background: copied === "cbu" ? "rgba(16,185,129,0.2)" : "rgba(255,255,255,0.07)",
-                    border: `1px solid ${copied === "cbu" ? "rgba(16,185,129,0.4)" : "rgba(255,255,255,0.12)"}`,
-                    color: copied === "cbu" ? "#10b981" : "#94a3b8",
-                    borderRadius: 9, padding: "8px 14px", fontSize: 13, fontWeight: 600,
-                    cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s",
-                  }}
-                >
-                  {copied === "cbu" ? "✓ Copiado" : "📋 Copiar CBU"}
-                </button>
+              )}
+            </div>
+
+            {/* ── AVISO COMPROBANTE ── */}
+            {hasDebt && (
+              <div style={{
+                background: "linear-gradient(135deg, rgba(16,185,129,0.1), rgba(16,185,129,0.05))",
+                border: "1.5px solid rgba(16,185,129,0.3)",
+                borderRadius: 20, padding: "22px", marginBottom: 14,
+                animation: "fadeUp 0.5s ease 0.15s both",
+              }}>
+                <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
+                  <div style={{
+                    width: 46, height: 46, borderRadius: 13, flexShrink: 0,
+                    background: "rgba(16,185,129,0.15)",
+                    display: "flex", alignItems: "center", justifyContent: "center", color: "#10b981",
+                  }}>
+                    <WhatsAppIcon size={24} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ margin: "0 0 5px", color: "#10b981", fontWeight: 800, fontSize: 15 }}>
+                      ⚠️ Una vez pagado, enviá el comprobante
+                    </p>
+                    <p style={{ margin: "0 0 14px", color: "#6ee7b7", fontSize: 13, lineHeight: 1.6 }}>
+                      Después de realizar el pago, <strong>enviá el comprobante a administración por WhatsApp</strong> para que podamos acreditarlo a la brevedad.
+                    </p>
+                    <a
+                      href={WHATSAPP_URL(wpPaymentMsg)}
+                      target="_blank" rel="noopener noreferrer"
+                      style={{
+                        display: "inline-flex", alignItems: "center", gap: 9,
+                        background: "linear-gradient(135deg, #25d366, #128c7e)",
+                        color: "#fff", borderRadius: 11, padding: "11px 20px",
+                        fontWeight: 700, fontSize: 14, textDecoration: "none", fontFamily: "inherit",
+                        boxShadow: "0 4px 16px rgba(37,211,102,0.3)", transition: "opacity 0.2s",
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.opacity = "0.88"}
+                      onMouseLeave={e => e.currentTarget.style.opacity = "1"}
+                    >
+                      <WhatsAppIcon size={18} /> Enviar comprobante de pago
+                    </a>
+                  </div>
+                </div>
               </div>
             )}
-            <div style={{
-              display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap",
-              paddingTop: cbu ? "10px" : 0, borderTop: cbu ? "1px solid rgba(255,255,255,0.06)" : "none",
+
+            {/* ── ESTADO DEL SERVICIO ── */}
+            <div className="status-card" style={{
+              background: "rgba(255,255,255,0.04)", backdropFilter: "blur(12px)",
+              border: `1px solid ${svcStatus.color}30`, borderRadius: 20,
+              padding: "20px 24px", marginBottom: 14,
+              animation: "fadeUp 0.5s ease 0.18s both",
+              display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 14,
             }}>
               <div>
-                <span style={{ color: "#475569", fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1 }}>Alias</span>
-                <p style={{ margin: "2px 0 0", color: "#94a3b8", fontSize: 13, fontFamily: "monospace", letterSpacing: "1px" }}>{ALIAS}</p>
+                <p style={{ margin: "0 0 4px", color: "#475569", fontSize: 11, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase" }}>
+                  Estado del servicio
+                </p>
+                <span style={{
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                  background: svcStatus.bg, color: svcStatus.color,
+                  borderRadius: 99, padding: "5px 14px", fontSize: 14, fontWeight: 700,
+                }}>
+                  <span style={{ fontSize: 10 }}>●</span> {svcStatus.label}
+                </span>
               </div>
-              <button
-                onClick={() => handleCopy(ALIAS, "alias")}
+              <div style={{ textAlign: "right" }}>
+                <p style={{ margin: "0 0 2px", color: "#475569", fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase" }}>
+                  Próxima fecha de corte
+                </p>
+                <p style={{ margin: 0, color: "#cbd5e1", fontSize: 14, fontWeight: 600 }}>
+                  📅 {cutoffDate}
+                </p>
+              </div>
+            </div>
+
+          </div>{/* fin columna izquierda */}
+
+          {/* COLUMNA DERECHA */}
+          <div className="profile-col">
+
+            {/* ── CBU / ALIAS ── */}
+            <div style={{
+              background: "rgba(255,255,255,0.04)", backdropFilter: "blur(12px)",
+              border: "1px solid rgba(255,255,255,0.08)", borderRadius: 20,
+              padding: "20px 24px", marginBottom: 14,
+              animation: "fadeUp 0.5s ease 0.22s both",
+            }}>
+              <p style={{ margin: "0 0 14px", color: "#f8fafc", fontWeight: 700, fontSize: 15 }}>
+                💳 Datos para el pago
+              </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {cbu && (
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                    <div>
+                      <span style={{ color: "#475569", fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1 }}>CBU</span>
+                      <p style={{ margin: "2px 0 0", color: "#94a3b8", fontSize: 13, fontFamily: "monospace", letterSpacing: "1px" }}>{cbu}</p>
+                    </div>
+                    <button onClick={() => handleCopy(cbu, "cbu")} style={{
+                      display: "flex", alignItems: "center", gap: 7, flexShrink: 0,
+                      background: copied === "cbu" ? "rgba(16,185,129,0.2)" : "rgba(255,255,255,0.07)",
+                      border: `1px solid ${copied === "cbu" ? "rgba(16,185,129,0.4)" : "rgba(255,255,255,0.12)"}`,
+                      color: copied === "cbu" ? "#10b981" : "#94a3b8",
+                      borderRadius: 9, padding: "8px 14px", fontSize: 13, fontWeight: 600,
+                      cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s",
+                    }}>
+                      {copied === "cbu" ? "✓ Copiado" : "📋 Copiar CBU"}
+                    </button>
+                  </div>
+                )}
+                <div style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap",
+                  paddingTop: cbu ? "10px" : 0, borderTop: cbu ? "1px solid rgba(255,255,255,0.06)" : "none",
+                }}>
+                  <div>
+                    <span style={{ color: "#475569", fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1 }}>Alias</span>
+                    <p style={{ margin: "2px 0 0", color: "#94a3b8", fontSize: 13, fontFamily: "monospace", letterSpacing: "1px" }}>{ALIAS}</p>
+                  </div>
+                  <button onClick={() => handleCopy(ALIAS, "alias")} style={{
+                    display: "flex", alignItems: "center", gap: 7, flexShrink: 0,
+                    background: copied === "alias" ? "rgba(16,185,129,0.2)" : "rgba(255,255,255,0.07)",
+                    border: `1px solid ${copied === "alias" ? "rgba(16,185,129,0.4)" : "rgba(255,255,255,0.12)"}`,
+                    color: copied === "alias" ? "#10b981" : "#94a3b8",
+                    borderRadius: 9, padding: "8px 14px", fontSize: 13, fontWeight: 600,
+                    cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s",
+                  }}>
+                    {copied === "alias" ? "✓ Copiado" : "📋 Copiar alias"}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* ── FACTURA ── */}
+            <div style={{
+              background: "rgba(255,255,255,0.04)", backdropFilter: "blur(12px)",
+              border: "1px solid rgba(255,255,255,0.08)", borderRadius: 20,
+              padding: "22px 24px", marginBottom: 14,
+              animation: "fadeUp 0.5s ease 0.2s both",
+            }}>
+              <p style={{ margin: "0 0 3px", color: "#f8fafc", fontWeight: 700, fontSize: 15 }}>📄 Última factura</p>
+              <p style={{ margin: "0 0 14px", color: "#334155", fontSize: 13 }}>Período: Febrero 2026 · Nº {customer.code}</p>
+              <a
+                href={invoiceUrl} target="_blank" rel="noopener noreferrer"
                 style={{
-                  display: "flex", alignItems: "center", gap: 7, flexShrink: 0,
-                  background: copied === "alias" ? "rgba(16,185,129,0.2)" : "rgba(255,255,255,0.07)",
-                  border: `1px solid ${copied === "alias" ? "rgba(16,185,129,0.4)" : "rgba(255,255,255,0.12)"}`,
-                  color: copied === "alias" ? "#10b981" : "#94a3b8",
-                  borderRadius: 9, padding: "8px 14px", fontSize: 13, fontWeight: 600,
-                  cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+                  background: "linear-gradient(135deg, #6366f1, #4f46e5)",
+                  color: "#fff", borderRadius: 12, padding: "13px 24px",
+                  fontWeight: 700, fontSize: 15, textDecoration: "none", fontFamily: "inherit",
+                  boxShadow: "0 6px 20px rgba(99,102,241,0.25)", transition: "opacity 0.2s",
                 }}
+                onMouseEnter={e => e.currentTarget.style.opacity = "0.88"}
+                onMouseLeave={e => e.currentTarget.style.opacity = "1"}
               >
-                {copied === "alias" ? "✓ Copiado" : "📋 Copiar alias"}
-              </button>
+                <DownloadIcon /> Descargar factura (PDF)
+              </a>
             </div>
-          </div>
-        </div>
 
-        {/* ── FACTURA ── */}
-        <div style={{
-          background: "rgba(255,255,255,0.04)", backdropFilter: "blur(12px)",
-          border: "1px solid rgba(255,255,255,0.08)", borderRadius: 20,
-          padding: "22px 24px", marginBottom: 14,
-          animation: "fadeUp 0.5s ease 0.2s both",
-        }}>
-          <p style={{ margin: "0 0 3px", color: "#f8fafc", fontWeight: 700, fontSize: 15 }}>📄 Última factura</p>
-          <p style={{ margin: "0 0 14px", color: "#334155", fontSize: 13 }}>Período: Febrero 2026 · Nº {customer.code}</p>
-          <a
-            href={invoiceUrl} target="_blank" rel="noopener noreferrer"
-            style={{
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-              background: "linear-gradient(135deg, #6366f1, #4f46e5)",
-              color: "#fff", borderRadius: 12, padding: "13px 24px",
-              fontWeight: 700, fontSize: 15, textDecoration: "none", fontFamily: "inherit",
-              boxShadow: "0 6px 20px rgba(99,102,241,0.25)", transition: "opacity 0.2s",
-            }}
-            onMouseEnter={e => e.currentTarget.style.opacity = "0.88"}
-            onMouseLeave={e => e.currentTarget.style.opacity = "1"}
-          >
-            <DownloadIcon /> Descargar factura (PDF)
-          </a>
-        </div>
-
-        {/* ── DATOS ── */}
-        <div style={{
-          background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
-          borderRadius: 16, padding: "18px 22px", marginBottom: 14,
-          animation: "fadeUp 0.5s ease 0.3s both",
-        }}>
-          <p style={{ margin: "0 0 12px", color: "#475569", fontSize: 11, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase" }}>
-            Datos de la cuenta
-          </p>
-          {[
-            { label: "Domicilio", value: customer.address },
-            { label: "Localidad", value: `${customer.city?.name}, ${customer.city?.province}` },
-            customer.phones?.[0] && { label: "Teléfono", value: customer.phones[0].number },
-            { label: "Código de cliente", value: customer.code, highlight: true },
-          ].filter(Boolean).map(row => (
-            <div key={row.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <span style={{ color: "#475569", fontSize: 14 }}>{row.label}</span>
-              <span style={{ color: row.highlight ? "#10b981" : "#94a3b8", fontSize: 14, fontWeight: row.highlight ? 700 : 500 }}>{row.value}</span>
+            {/* ── DATOS ── */}
+            <div style={{
+              background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
+              borderRadius: 16, padding: "18px 22px", marginBottom: 14,
+              animation: "fadeUp 0.5s ease 0.3s both",
+            }}>
+              <p style={{ margin: "0 0 12px", color: "#475569", fontSize: 11, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase" }}>
+                Datos de la cuenta
+              </p>
+              {[
+                { label: "Domicilio", value: customer.address },
+                { label: "Localidad", value: `${customer.city?.name}, ${customer.city?.province}` },
+                customer.phones?.[0] && { label: "Teléfono", value: customer.phones[0].number },
+                { label: "Código de cliente", value: customer.code, highlight: true },
+              ].filter(Boolean).map(row => (
+                <div key={row.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                  <span style={{ color: "#475569", fontSize: 14 }}>{row.label}</span>
+                  <span style={{ color: row.highlight ? "#10b981" : "#94a3b8", fontSize: 14, fontWeight: row.highlight ? 700 : 500 }}>{row.value}</span>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
 
-        {/* ── CONTACTO ADMIN ── */}
-        <div style={{
-          background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
-          borderRadius: 16, padding: "18px 22px",
-          animation: "fadeUp 0.5s ease 0.35s both",
-          display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 14,
-        }}>
-          <div>
-            <p style={{ margin: "0 0 2px", color: "#cbd5e1", fontWeight: 600, fontSize: 14 }}>¿Necesitás ayuda?</p>
-            <p style={{ margin: 0, color: "#334155", fontSize: 13 }}>Contactá a administración OriNet</p>
-          </div>
-          <a
-            href={WHATSAPP_URL(wpHelpMsg)}
-            target="_blank" rel="noopener noreferrer"
-            style={{
-              display: "inline-flex", alignItems: "center", gap: 8,
-              background: "rgba(37,211,102,0.09)", border: "1px solid rgba(37,211,102,0.22)",
-              color: "#4ade80", borderRadius: 10, padding: "10px 18px",
-              fontSize: 14, fontWeight: 600, textDecoration: "none", fontFamily: "inherit",
-              whiteSpace: "nowrap", transition: "all 0.2s",
-            }}
-            onMouseEnter={e => e.currentTarget.style.background = "rgba(37,211,102,0.16)"}
-            onMouseLeave={e => e.currentTarget.style.background = "rgba(37,211,102,0.09)"}
-          >
-            <WhatsAppIcon size={17} /> Escribir por WhatsApp
-          </a>
-        </div>
+            {/* ── CONTACTO ADMIN ── */}
+            <div style={{
+              background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
+              borderRadius: 16, padding: "18px 22px",
+              animation: "fadeUp 0.5s ease 0.35s both",
+              display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 14,
+            }}>
+              <div>
+                <p style={{ margin: "0 0 2px", color: "#cbd5e1", fontWeight: 600, fontSize: 14 }}>¿Necesitás ayuda?</p>
+                <p style={{ margin: 0, color: "#334155", fontSize: 13 }}>Contactá a administración OriNet</p>
+              </div>
+              <a
+                href={WHATSAPP_URL(wpHelpMsg)}
+                target="_blank" rel="noopener noreferrer"
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 8,
+                  background: "rgba(37,211,102,0.09)", border: "1px solid rgba(37,211,102,0.22)",
+                  color: "#4ade80", borderRadius: 10, padding: "10px 18px",
+                  fontSize: 14, fontWeight: 600, textDecoration: "none", fontFamily: "inherit",
+                  whiteSpace: "nowrap", transition: "all 0.2s",
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = "rgba(37,211,102,0.16)"}
+                onMouseLeave={e => e.currentTarget.style.background = "rgba(37,211,102,0.09)"}
+              >
+                <WhatsAppIcon size={17} /> Escribir por WhatsApp
+              </a>
+            </div>
 
+          </div>{/* fin columna derecha */}
+        </div>{/* fin grid */}
       </div>
 
       <style>{`
@@ -758,8 +697,19 @@ function ProfileScreen({ customer, onLogout }) {
           from { opacity: 0; transform: translateY(16px); }
           to   { opacity: 1; transform: translateY(0); }
         }
-        @media (max-width: 480px) {
-          .profile-content { padding: 20px 14px 0 !important; }
+        .profile-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 14px;
+          align-items: start;
+        }
+        .profile-col {
+          display: flex;
+          flex-direction: column;
+        }
+        @media (max-width: 700px) {
+          .profile-grid { grid-template-columns: 1fr; }
+          .profile-content { padding: 20px 14px 40px !important; }
           .debt-amount { font-size: 44px !important; letter-spacing: -1px !important; }
           .status-card { flex-direction: column !important; align-items: flex-start !important; }
           .status-card > div:last-child { text-align: left !important; }
