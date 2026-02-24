@@ -122,6 +122,40 @@ async function fetchCustomerByDNI(dni) {
   return data;
 }
 
+// Trae la última factura del cliente y devuelve la URL del PDF
+async function fetchLastInvoiceUrl(customerId) {
+  const token = await getToken();
+  const headers = {
+    "Content-Type":  "application/json",
+    "Accept":        "application/json",
+    "api-key":       API_KEY,
+    "client-id":     CLIENT_ID,
+    "login-type":    "api",
+    "username":      API_USER,
+    "Authorization": `Bearer ${token}`,
+  };
+
+  // ISPCube: listado de facturas del cliente ordenado desc, tomamos la primera
+  const res = await fetch(
+    `${API_BASE}/invoice?customer_id=${customerId}&sort=created_at&order=desc&limit=1`,
+    { method: "GET", headers }
+  );
+  if (!res.ok) {
+    console.warn("No se pudo obtener la factura:", res.status);
+    return null;
+  }
+  const data = await res.json();
+  const invoice = Array.isArray(data) ? data[0] : data?.data?.[0] ?? data;
+  if (!invoice?.id) return null;
+
+  // ISPCube expone el PDF en /invoice/{id}/pdf o en el campo pdf_url / url
+  if (invoice.pdf_url) return invoice.pdf_url;
+  if (invoice.url)     return invoice.url;
+
+  // Fallback: construir la URL del PDF directamente
+  return `${API_BASE}/invoice/${invoice.id}/pdf`;
+}
+
 const formatMoney = (val) =>
   new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", minimumFractionDigits: 2 }).format(parseFloat(val) || 0);
 
@@ -371,12 +405,21 @@ function LoginScreen({ onLogin }) {
 
 // ─── PERFIL ────────────────────────────────────────────────────────────────
 function ProfileScreen({ customer, onLogout }) {
-  const [copied, setCopied] = useState(null); // "cbu" | "alias" | null
+  const [copied, setCopied] = useState(null);
+  const [invoiceUrl, setInvoiceUrl]   = useState(null);
+  const [invoiceLoading, setInvoiceLoading] = useState(true);
 
   const debt = parseFloat(customer.debt) || 0;
   const dueDebt = parseFloat(customer.duedebt) || 0;
   const hasDebt = debt > 0;
-  const invoiceUrl = customer.last_invoice_url;
+
+  // Cargar URL de la última factura al montar
+  useEffect(() => {
+    fetchLastInvoiceUrl(customer.id)
+      .then(url => setInvoiceUrl(url))
+      .catch(err => { console.warn("Factura no disponible:", err); setInvoiceUrl(null); })
+      .finally(() => setInvoiceLoading(false));
+  }, [customer.id]);
 
   const debtColor = !hasDebt ? "#10b981" : debt > 5000 ? "#ef4444" : "#f59e0b";
   const debtBg    = !hasDebt ? "rgba(16,185,129,0.12)" : debt > 5000 ? "rgba(239,68,68,0.12)" : "rgba(245,158,11,0.12)";
@@ -621,21 +664,36 @@ function ProfileScreen({ customer, onLogout }) {
               animation: "fadeUp 0.5s ease 0.2s both",
             }}>
               <p style={{ margin: "0 0 3px", color: "#f8fafc", fontWeight: 700, fontSize: 15 }}>📄 Última factura</p>
-              <p style={{ margin: "0 0 14px", color: "#334155", fontSize: 13 }}>Período: Febrero 2026 · Nº {customer.code}</p>
-              <a
-                href={invoiceUrl} target="_blank" rel="noopener noreferrer"
-                style={{
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-                  background: "linear-gradient(135deg, #6366f1, #4f46e5)",
-                  color: "#fff", borderRadius: 12, padding: "13px 24px",
-                  fontWeight: 700, fontSize: 15, textDecoration: "none", fontFamily: "inherit",
-                  boxShadow: "0 6px 20px rgba(99,102,241,0.25)", transition: "opacity 0.2s",
-                }}
-                onMouseEnter={e => e.currentTarget.style.opacity = "0.88"}
-                onMouseLeave={e => e.currentTarget.style.opacity = "1"}
-              >
-                <DownloadIcon /> Descargar factura (PDF)
-              </a>
+              <p style={{ margin: "0 0 14px", color: "#334155", fontSize: 13 }}>Nº de cliente: {customer.code}</p>
+              {invoiceLoading ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 10, color: "#475569", fontSize: 14 }}>
+                  <span style={{
+                    width: 16, height: 16, border: "2px solid rgba(255,255,255,0.15)",
+                    borderTop: "2px solid #6366f1", borderRadius: "50%",
+                    display: "inline-block", animation: "spin 0.7s linear infinite", flexShrink: 0,
+                  }} />
+                  Buscando factura...
+                </div>
+              ) : invoiceUrl ? (
+                <a
+                  href={invoiceUrl} target="_blank" rel="noopener noreferrer"
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+                    background: "linear-gradient(135deg, #6366f1, #4f46e5)",
+                    color: "#fff", borderRadius: 12, padding: "13px 24px",
+                    fontWeight: 700, fontSize: 15, textDecoration: "none", fontFamily: "inherit",
+                    boxShadow: "0 6px 20px rgba(99,102,241,0.25)", transition: "opacity 0.2s",
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.opacity = "0.88"}
+                  onMouseLeave={e => e.currentTarget.style.opacity = "1"}
+                >
+                  <DownloadIcon /> Descargar factura (PDF)
+                </a>
+              ) : (
+                <p style={{ margin: 0, color: "#475569", fontSize: 13 }}>
+                  No hay facturas disponibles por el momento.
+                </p>
+              )}
             </div>
 
             {/* ── DATOS ── */}
@@ -697,6 +755,7 @@ function ProfileScreen({ customer, onLogout }) {
           from { opacity: 0; transform: translateY(16px); }
           to   { opacity: 1; transform: translateY(0); }
         }
+        @keyframes spin { to { transform: rotate(360deg); } }
         .profile-grid {
           display: grid;
           grid-template-columns: 1fr 1fr;
