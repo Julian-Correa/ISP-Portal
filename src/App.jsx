@@ -15,9 +15,9 @@ const CUT_DAY = 26; // fecha de corte fija
 
 function getServiceStatus(status) {
   const s = (status || "").toLowerCase();
-  if (["active", "activo"].includes(s))
+  if (["active", "activo", "enabled"].includes(s))
     return { label: "Activo",       color: "#10b981", bg: "rgba(16,185,129,0.12)" };
-  if (["blocked", "bloqueado", "block"].includes(s))
+  if (["blocked", "bloqueado", "block", "suspended", "suspendido", "disabled"].includes(s))
     return { label: "Suspendido",   color: "#ef4444", bg: "rgba(239,68,68,0.12)" };
   if (["no_service"].includes(s))
     return { label: "Sin servicio", color: "#f59e0b", bg: "rgba(245,158,11,0.12)" };
@@ -122,8 +122,8 @@ async function fetchCustomerByDNI(dni) {
   return data;
 }
 
-// Trae la última factura del cliente y devuelve la URL del PDF
-async function fetchLastInvoiceUrl(customerId) {
+// Trae la última factura del cliente usando el endpoint real de ISPCube
+async function fetchLastInvoiceUrl(customer) {
   const token = await getToken();
   const headers = {
     "Content-Type":  "application/json",
@@ -135,25 +135,47 @@ async function fetchLastInvoiceUrl(customerId) {
     "Authorization": `Bearer ${token}`,
   };
 
-  // ISPCube: listado de facturas del cliente ordenado desc, tomamos la primera
-  const res = await fetch(
-    `${API_BASE}/invoice?customer_id=${customerId}&sort=created_at&order=desc&limit=1`,
-    { method: "GET", headers }
-  );
+  // Sin filtro de tipo — traemos cualquier factura del cliente
+  const params = new URLSearchParams({
+    customer_id:  customer.id,
+    monthly_bill: "true",
+    canceled:     "false",
+  });
+
+  const url = `${API_BASE}/bills/last_bill_api?${params}`;
+  const res = await fetch(url, { method: "GET", headers });
+
   if (!res.ok) {
-    console.warn("No se pudo obtener la factura:", res.status);
+    const errText = await res.text();
+    console.warn("Error factura:", res.status, errText);
     return null;
   }
-  const data = await res.json();
-  const invoice = Array.isArray(data) ? data[0] : data?.data?.[0] ?? data;
-  if (!invoice?.id) return null;
 
-  // ISPCube expone el PDF en /invoice/{id}/pdf o en el campo pdf_url / url
-  if (invoice.pdf_url) return invoice.pdf_url;
-  if (invoice.url)     return invoice.url;
+  // ISPCube devuelve la URL directamente como texto plano (no JSON)
+  const text = await res.text();
+  console.log("Respuesta factura (raw):", text);
 
-  // Fallback: construir la URL del PDF directamente
-  return `${API_BASE}/invoice/${invoice.id}/pdf`;
+  // Si es una URL directa
+  const trimmed = text.trim().replace(/^["'\[\{]+|["'\]\}]+$/g, "");
+  if (trimmed.startsWith("http")) return trimmed;
+
+  // Intentar parsear como JSON por si acaso
+  try {
+    const data = JSON.parse(text);
+    if (Array.isArray(data) && data.length > 0) {
+      const item = data[0];
+      if (typeof item === "string") return item;
+      const values = Object.values(item);
+      if (values.length > 0 && typeof values[0] === "string") return values[0];
+      const keys = Object.keys(item);
+      if (keys.length > 0 && keys[0].startsWith("http")) return keys[0];
+    }
+    if (data && typeof data === "object") {
+      return data.url || data.pdf_url || data.link || null;
+    }
+  } catch { /* no era JSON, ya manejado arriba */ }
+
+  return null;
 }
 
 const formatMoney = (val) =>
@@ -415,7 +437,7 @@ function ProfileScreen({ customer, onLogout }) {
 
   // Cargar URL de la última factura al montar
   useEffect(() => {
-    fetchLastInvoiceUrl(customer.id)
+    fetchLastInvoiceUrl(customer)
       .then(url => setInvoiceUrl(url))
       .catch(err => { console.warn("Factura no disponible:", err); setInvoiceUrl(null); })
       .finally(() => setInvoiceLoading(false));
