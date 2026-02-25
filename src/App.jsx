@@ -178,17 +178,21 @@ async function fetchLastInvoiceUrl(customer) {
   return null;
 }
 
-// Actualiza el email de contacto del cliente en ISPCube
+// Actualiza o crea el email de contacto del cliente en ISPCube
 async function updateCustomerEmail(customer, email) {
   const token = await getToken();
   const id = parseInt(customer.id, 10);
+
+  // Si ya tiene email, usamos su id para editarlo. Si no, -1 para crear uno nuevo.
+  const existingEmail = customer.contact_emails?.[0];
+  const emailId = existingEmail?.id ? parseInt(existingEmail.id, 10) : -1;
 
   const body = {
     id,
     doc_number:             customer.doc_number,
     identification_type_id: customer.identification_type_id || 1,
     entity_id:              customer.entity_id,
-    email:                  [email],
+    email: [{ id: emailId, email, principal: 1 }],
   };
 
   console.log("PUT /customers body:", JSON.stringify(body));
@@ -464,9 +468,11 @@ function LoginScreen({ onLogin }) {
 
 // ─── EMAIL CARD ────────────────────────────────────────────────────────────
 function EmailCard({ customer }) {
-  const existing = customer.contact_emails?.[0]?.email || "";
-  const [email, setEmail]       = useState(existing);
-  const [status, setStatus]     = useState(null); // null | "saving" | "ok" | "error"
+  const existingEmail = customer.contact_emails?.[0]?.email || "";
+  const isEditing     = !!existingEmail;
+
+  const [email, setEmail]       = useState(existingEmail);
+  const [status, setStatus]     = useState(null);
   const [errorMsg, setErrorMsg] = useState("");
 
   const validate = (val) => {
@@ -512,10 +518,12 @@ function EmailCard({ customer }) {
         </div>
         <div>
           <p style={{ margin: 0, color: "#c7d2fe", fontWeight: 700, fontSize: 15 }}>
-            📧 Recibí tu factura por email
+            📧 {isEditing ? "Editar email de facturación" : "Recibí tu factura por email"}
           </p>
           <p style={{ margin: "3px 0 0", color: "#475569", fontSize: 12, lineHeight: 1.5 }}>
-            Registrá tu mail y te la enviamos todos los meses automáticamente.
+            {isEditing
+              ? `Email actual: ${existingEmail}`
+              : "Registrá tu mail y te la enviamos todos los meses automáticamente."}
           </p>
         </div>
       </div>
