@@ -178,6 +178,30 @@ async function fetchLastInvoiceUrl(customer) {
   return null;
 }
 
+// Actualiza el email de contacto del cliente en ISPCube
+async function updateCustomerEmail(customerId, email) {
+  const token = await getToken();
+  const res = await fetch(`${API_BASE}/customers/${customerId}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type":  "application/json",
+      "Accept":        "application/json",
+      "api-key":       API_KEY,
+      "client-id":     CLIENT_ID,
+      "login-type":    "api",
+      "username":      API_USER,
+      "Authorization": `Bearer ${token}`,
+    },
+    body: JSON.stringify({ email: [email] }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err || `Error ${res.status}`);
+  }
+  return true;
+}
+
+
 const formatMoney = (val) =>
   new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", minimumFractionDigits: 2 }).format(parseFloat(val) || 0);
 
@@ -421,6 +445,129 @@ function LoginScreen({ onLogin }) {
           .login-logo-wrap svg { width: 240px !important; height: auto !important; }
         }
       `}</style>
+    </div>
+  );
+}
+
+// ─── EMAIL CARD ────────────────────────────────────────────────────────────
+function EmailCard({ customer }) {
+  const existing = customer.contact_emails?.[0]?.email || "";
+  const [email, setEmail]       = useState(existing);
+  const [status, setStatus]     = useState(null); // null | "saving" | "ok" | "error"
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const validate = (val) => {
+    if (!val.trim()) return "Ingresá un email.";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) return "El email no es válido.";
+    return null;
+  };
+
+  const handleSave = async () => {
+    const err = validate(email);
+    if (err) { setErrorMsg(err); return; }
+    setErrorMsg("");
+    setStatus("saving");
+    try {
+      await updateCustomerEmail(customer.id, email.trim());
+      setStatus("ok");
+      setTimeout(() => setStatus(null), 3500);
+    } catch (e) {
+      console.error(e);
+      setStatus("error");
+      setErrorMsg("No se pudo guardar. Intentá de nuevo.");
+    }
+  };
+
+  return (
+    <div style={{
+      background: "linear-gradient(135deg, rgba(99,102,241,0.08), rgba(99,102,241,0.04))",
+      border: "1px solid rgba(99,102,241,0.22)", borderRadius: 20,
+      padding: "22px 24px", marginBottom: 14,
+      animation: "fadeUp 0.5s ease 0.28s both",
+    }}>
+      {/* Ícono + título */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+        <div style={{
+          width: 40, height: 40, borderRadius: 11, flexShrink: 0,
+          background: "rgba(99,102,241,0.15)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#818cf8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="4" width="20" height="16" rx="2"/>
+            <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+          </svg>
+        </div>
+        <div>
+          <p style={{ margin: 0, color: "#c7d2fe", fontWeight: 700, fontSize: 15 }}>
+            📧 Recibí tu factura por email
+          </p>
+          <p style={{ margin: "3px 0 0", color: "#475569", fontSize: 12, lineHeight: 1.5 }}>
+            Registrá tu mail y te la enviamos todos los meses automáticamente.
+          </p>
+        </div>
+      </div>
+
+      {/* Input */}
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 14 }}>
+        <input
+          type="email"
+          value={email}
+          onChange={e => { setEmail(e.target.value); setErrorMsg(""); setStatus(null); }}
+          onKeyDown={e => e.key === "Enter" && handleSave()}
+          placeholder="tucorreo@ejemplo.com"
+          style={{
+            flex: 1, minWidth: 200, boxSizing: "border-box",
+            background: "rgba(255,255,255,0.06)",
+            border: `1.5px solid ${errorMsg ? "#f87171" : status === "ok" ? "#10b981" : "rgba(99,102,241,0.3)"}`,
+            borderRadius: 11, padding: "11px 16px", fontSize: 14,
+            color: "#f8fafc", outline: "none", fontFamily: "inherit",
+            transition: "border 0.2s",
+          }}
+          onFocus={e => !errorMsg && (e.target.style.borderColor = "#818cf8")}
+          onBlur={e => !errorMsg && status !== "ok" && (e.target.style.borderColor = "rgba(99,102,241,0.3)")}
+        />
+        <button
+          onClick={handleSave}
+          disabled={status === "saving"}
+          style={{
+            flexShrink: 0,
+            background: status === "ok"
+              ? "linear-gradient(135deg, #10b981, #059669)"
+              : "linear-gradient(135deg, #6366f1, #4f46e5)",
+            border: "none", borderRadius: 11, padding: "11px 20px",
+            color: "#fff", fontWeight: 700, fontSize: 14,
+            cursor: status === "saving" ? "not-allowed" : "pointer",
+            fontFamily: "inherit", transition: "all 0.2s",
+            display: "flex", alignItems: "center", gap: 8,
+            boxShadow: status === "ok" ? "0 4px 16px rgba(16,185,129,0.3)" : "0 4px 16px rgba(99,102,241,0.3)",
+            opacity: status === "saving" ? 0.7 : 1,
+          }}
+        >
+          {status === "saving" ? (
+            <>
+              <span style={{
+                width: 14, height: 14, border: "2px solid rgba(255,255,255,0.3)",
+                borderTop: "2px solid #fff", borderRadius: "50%",
+                display: "inline-block", animation: "spin 0.7s linear infinite",
+              }} />
+              Guardando...
+            </>
+          ) : status === "ok" ? "✓ Guardado" : "Guardar"}
+        </button>
+      </div>
+
+      {/* Mensajes */}
+      {errorMsg && (
+        <p style={{ margin: "8px 0 0", color: "#fca5a5", fontSize: 12 }}>⚠ {errorMsg}</p>
+      )}
+      {status === "ok" && (
+        <p style={{ margin: "8px 0 0", color: "#6ee7b7", fontSize: 12 }}>
+          ✓ Tu email fue registrado correctamente. A partir del próximo período te llegará la factura.
+        </p>
+      )}
+      {status === "error" && !errorMsg && (
+        <p style={{ margin: "8px 0 0", color: "#fca5a5", fontSize: 12 }}>⚠ No se pudo guardar. Intentá de nuevo.</p>
+      )}
     </div>
   );
 }
@@ -740,6 +887,9 @@ function ProfileScreen({ customer, onLogout }) {
               ))}
             </div>
 
+            {/* ── EMAIL FACTURA ── */}
+            <EmailCard customer={customer} />
+
             {/* ── CONTACTO ADMIN ── */}
             <div style={{
               background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
@@ -771,6 +921,19 @@ function ProfileScreen({ customer, onLogout }) {
           </div>{/* fin columna derecha */}
         </div>{/* fin grid */}
       </div>
+
+      {/* ── FOOTER ── */}
+      <footer style={{
+        marginTop: 48, borderTop: "1px solid rgba(255,255,255,0.06)",
+        padding: "24px 28px", textAlign: "center",
+      }}>
+        <p style={{ margin: "0 0 6px", color: "#fff", fontSize: 13 }}>
+          © {new Date().getFullYear()} OriNet ISP S.R.L. — Todos los derechos reservados.
+        </p>
+        <p style={{ margin: 0, color: "#1e293b", fontSize: 12 }}>
+          Portal de clientes · Desarrollado por OriNet
+        </p>
+      </footer>
 
       <style>{`
         @keyframes fadeUp {
