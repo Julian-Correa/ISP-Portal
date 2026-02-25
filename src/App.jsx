@@ -480,7 +480,7 @@ function LoginScreen({ onLogin }) {
 }
 
 // ─── EMAIL CARD ────────────────────────────────────────────────────────────
-function EmailCard({ customer }) {
+function EmailCard({ customer, onUpdateCustomer }) {
   const existingEmail = customer.contact_emails?.[0]?.email || "";
   const isEditing     = !!existingEmail;
 
@@ -502,9 +502,21 @@ function EmailCard({ customer }) {
     try {
       await updateCustomerEmail(customer, email.trim());
       setStatus("ok");
+
+      // Actualizar el objeto customer con el nuevo email sin perder la sesión
+      const existingId = customer.contact_emails?.[0]?.id;
+      const updatedCustomer = {
+        ...customer,
+        contact_emails: [{
+          id:    existingId || -1,
+          email: email.trim(),
+          principal: 1,
+        }],
+      };
+      onUpdateCustomer(updatedCustomer);
+
       setTimeout(() => setStatus(null), 3500);
     } catch (e) {
-      console.error(e);
       setStatus("error");
       setErrorMsg("No se pudo guardar. Intentá de nuevo.");
     }
@@ -607,7 +619,7 @@ function EmailCard({ customer }) {
 }
 
 // ─── PERFIL ────────────────────────────────────────────────────────────────
-function ProfileScreen({ customer, onLogout }) {
+function ProfileScreen({ customer, onLogout, onUpdateCustomer }) {
   const [copied, setCopied] = useState(null);
   const [invoiceUrl, setInvoiceUrl]   = useState(null);
   const [invoiceLoading, setInvoiceLoading] = useState(true);
@@ -922,7 +934,7 @@ function ProfileScreen({ customer, onLogout }) {
             </div>
 
             {/* ── EMAIL FACTURA ── */}
-            <EmailCard customer={customer} />
+            <EmailCard customer={customer} onUpdateCustomer={onUpdateCustomer} />
 
             {/* ── CONTACTO ADMIN ── */}
             <div style={{
@@ -1045,7 +1057,11 @@ export default function App() {
     <ErrorBoundary>
       <GlobalStyles />
       {customer
-        ? <ProfileScreen customer={customer} onLogout={() => setCustomer(null)} />
+        ? <ProfileScreen
+            customer={customer}
+            onUpdateCustomer={setCustomer}
+            onLogout={() => setCustomer(null)}
+          />
         : <LoginScreen onLogin={setCustomer} />}
     </ErrorBoundary>
   );
