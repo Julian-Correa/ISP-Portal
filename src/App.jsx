@@ -951,7 +951,7 @@ function ProfileScreen({ customer, onLogout }) {
         <p style={{ margin: "0 0 6px", color: "#fff", fontSize: 13 }}>
           © {new Date().getFullYear()} OriNet ISP S.R.L. — Todos los derechos reservados.
         </p>
-        <p style={{ margin: 0, color: "#1e293b", fontSize: 12 }}>
+        <p style={{ margin: 0, color: "#fff", fontSize: 12 }}>
           Portal de clientes · Desarrollado por OriNet
         </p>
       </footer>
