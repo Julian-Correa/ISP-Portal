@@ -179,9 +179,21 @@ async function fetchLastInvoiceUrl(customer) {
 }
 
 // Actualiza el email de contacto del cliente en ISPCube
-async function updateCustomerEmail(customerId, email) {
+async function updateCustomerEmail(customer, email) {
   const token = await getToken();
-  const res = await fetch(`${API_BASE}/customers/${customerId}`, {
+  const id = parseInt(customer.id, 10);
+
+  const body = {
+    id,
+    doc_number:             customer.doc_number,
+    identification_type_id: customer.identification_type_id || 1,
+    entity_id:              customer.entity_id,
+    email:                  [email],
+  };
+
+  console.log("PUT /customers body:", JSON.stringify(body));
+
+  const res = await fetch(`${API_BASE}/customers/${id}`, {
     method: "PUT",
     headers: {
       "Content-Type":  "application/json",
@@ -192,12 +204,13 @@ async function updateCustomerEmail(customerId, email) {
       "username":      API_USER,
       "Authorization": `Bearer ${token}`,
     },
-    body: JSON.stringify({ id: customerId, email: [email] }),
+    body: JSON.stringify(body),
   });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(err || `Error ${res.status}`);
-  }
+
+  const responseText = await res.text();
+  console.log("Respuesta PUT:", res.status, responseText);
+
+  if (!res.ok) throw new Error(responseText || `Error ${res.status}`);
   return true;
 }
 
@@ -468,7 +481,7 @@ function EmailCard({ customer }) {
     setErrorMsg("");
     setStatus("saving");
     try {
-      await updateCustomerEmail(customer.id, email.trim());
+      await updateCustomerEmail(customer, email.trim());
       setStatus("ok");
       setTimeout(() => setStatus(null), 3500);
     } catch (e) {
