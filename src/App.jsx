@@ -192,7 +192,7 @@ async function updateCustomerEmail(customerId, email) {
       "username":      API_USER,
       "Authorization": `Bearer ${token}`,
     },
-    body: JSON.stringify({ email: [email] }),
+    body: JSON.stringify({ id: customerId, email: [email] }),
   });
   if (!res.ok) {
     const err = await res.text();
@@ -927,7 +927,7 @@ function ProfileScreen({ customer, onLogout }) {
         marginTop: 48, borderTop: "1px solid rgba(255,255,255,0.06)",
         padding: "24px 28px", textAlign: "center",
       }}>
-        <p style={{ margin: "0 0 6px", color: "#fff", fontSize: 13 }}>
+        <p style={{ margin: "0 0 6px", color: "#1e293b", fontSize: 13 }}>
           © {new Date().getFullYear()} OriNet ISP S.R.L. — Todos los derechos reservados.
         </p>
         <p style={{ margin: 0, color: "#1e293b", fontSize: 12 }}>
