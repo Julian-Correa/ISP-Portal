@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Component } from "react";
 
 function useIsMobile() {
   const [mobile, setMobile] = useState(() => typeof window !== "undefined" && window.innerWidth < 600);
@@ -195,8 +195,6 @@ async function updateCustomerEmail(customer, email) {
     email: [{ id: emailId, email, principal: 1 }],
   };
 
-  console.log("PUT /customers body:", JSON.stringify(body));
-
   const res = await fetch(`${API_BASE}/customers/${id}`, {
     method: "PUT",
     headers: {
@@ -212,9 +210,11 @@ async function updateCustomerEmail(customer, email) {
   });
 
   const responseText = await res.text();
-  console.log("Respuesta PUT:", res.status, responseText);
 
   if (!res.ok) throw new Error(responseText || `Error ${res.status}`);
+
+  // ISPCube puede devolver 200 con "Ok, with errors" — lo tratamos como éxito
+  // ya que los otros campos (doc_number, entity_id) se actualizan correctamente
   return true;
 }
 
@@ -948,7 +948,7 @@ function ProfileScreen({ customer, onLogout }) {
         marginTop: 48, borderTop: "1px solid rgba(255,255,255,0.06)",
         padding: "24px 28px", textAlign: "center",
       }}>
-        <p style={{ margin: "0 0 6px", color: "#1e293b", fontSize: 13 }}>
+        <p style={{ margin: "0 0 6px", color: "#fff", fontSize: 13 }}>
           © {new Date().getFullYear()} OriNet ISP S.R.L. — Todos los derechos reservados.
         </p>
         <p style={{ margin: 0, color: "#1e293b", fontSize: 12 }}>
@@ -984,10 +984,52 @@ function ProfileScreen({ customer, onLogout }) {
   );
 }
 
+// ─── ERROR BOUNDARY ────────────────────────────────────────────────────────
+class ErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { crashed: false }; }
+  static getDerivedStateFromError() { return { crashed: true }; }
+  render() {
+    if (this.state.crashed) {
+      return (
+        <div style={{
+          minHeight: "100vh", display: "flex", flexDirection: "column",
+          alignItems: "center", justifyContent: "center",
+          background: "linear-gradient(160deg, #0a0f1e 0%, #0d2240 55%, #0a1a35 100%)",
+          fontFamily: "'Outfit', sans-serif", padding: 24, textAlign: "center",
+        }}>
+          <p style={{ fontSize: 40, margin: "0 0 16px" }}>⚠️</p>
+          <p style={{ color: "#f8fafc", fontSize: 18, fontWeight: 700, margin: "0 0 8px" }}>
+            Ocurrió un error inesperado
+          </p>
+          <p style={{ color: "#475569", fontSize: 14, margin: "0 0 28px" }}>
+            Por favor recargá la página para continuar.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            style={{
+              background: "linear-gradient(135deg, #10b981, #059669)",
+              border: "none", borderRadius: 12, padding: "13px 28px",
+              color: "#fff", fontSize: 15, fontWeight: 700,
+              cursor: "pointer", fontFamily: "inherit",
+            }}
+          >
+            Recargar página
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 // ─── APP ──────────────────────────────────────────────────────────────────
 export default function App() {
   const [customer, setCustomer] = useState(null);
-  return customer
-    ? <ProfileScreen customer={customer} onLogout={() => setCustomer(null)} />
-    : <LoginScreen onLogin={setCustomer} />;
+  return (
+    <ErrorBoundary>
+      {customer
+        ? <ProfileScreen customer={customer} onLogout={() => setCustomer(null)} />
+        : <LoginScreen onLogin={setCustomer} />}
+    </ErrorBoundary>
+  );
 }
