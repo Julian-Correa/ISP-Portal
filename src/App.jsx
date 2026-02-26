@@ -397,7 +397,7 @@ function LoginScreen({ onLogin }) {
         <div style={{ height: 1, background: "rgba(255,255,255,0.07)", marginBottom: 28 }} />
 
         <div>
-          <label style={{ display: "block", color: "#94a3b8", fontSize: 12, fontWeight: 700, marginBottom: 8, letterSpacing: "1px", textTransform: "uppercase" }}>
+          <label style={{ display: "block", color: "#cbd5e1", fontSize: 12, fontWeight: 700, marginBottom: 8, letterSpacing: "1px", textTransform: "uppercase" }}>
             DNI (sin puntos ni espacios)
           </label>
           <input
@@ -447,7 +447,7 @@ function LoginScreen({ onLogin }) {
         </div>
 
         <div style={{ marginTop: 28, textAlign: "center" }}>
-          <p style={{ margin: "0 0 10px", color: "#334155", fontSize: 12 }}>
+          <p style={{ margin: "0 0 10px", color: "#64748b", fontSize: 12 }}>
             ¿Problemas para ingresar?
           </p>
           <a
@@ -545,7 +545,7 @@ function EmailCard({ customer, onUpdateCustomer }) {
           <p style={{ margin: 0, color: "#c7d2fe", fontWeight: 700, fontSize: 15 }}>
             📧 {isEditing ? "Editar email de facturación" : "Recibí tu factura por email"}
           </p>
-          <p style={{ margin: "3px 0 0", color: "#475569", fontSize: 12, lineHeight: 1.5 }}>
+          <p style={{ margin: "3px 0 0", color: "#cbd5e1", fontSize: 12, lineHeight: 1.5 }}>
             {isEditing
               ? `Email actual: ${existingEmail}`
               : "Registrá tu mail y te la enviamos todos los meses automáticamente."}
@@ -691,11 +691,11 @@ function ProfileScreen({ customer, onLogout, onUpdateCustomer }) {
 
         {/* Saludo */}
         <div style={{ marginBottom: 28, animation: "fadeUp 0.4s ease" }}>
-          <p style={{ margin: "0 0 2px", color: "#475569", fontSize: 14 }}>Bienvenido/a,</p>
+          <p style={{ margin: "0 0 2px", color: "#cbd5e1", fontSize: 14 }}>Bienvenido/a,</p>
           <h2 style={{ margin: 0, color: "#f8fafc", fontSize: 28, fontWeight: 800, letterSpacing: "-0.5px" }}>
             {formatName(customer.name)}
           </h2>
-          <p style={{ margin: "6px 0 0", color: "#334155", fontSize: 13 }}>
+          <p style={{ margin: "6px 0 0", color: "#64748b", fontSize: 13 }}>
             DNI {customer.doc_number} · {customer.city?.name}, {customer.city?.province}
           </p>
         </div>
@@ -714,7 +714,7 @@ function ProfileScreen({ customer, onLogout, onUpdateCustomer }) {
               boxShadow: `0 0 60px ${debtColor}15`,
               animation: "fadeUp 0.5s ease 0.1s both",
             }}>
-              <p style={{ margin: "0 0 10px", color: "#475569", fontSize: 11, fontWeight: 700, letterSpacing: 2.5, textTransform: "uppercase" }}>
+              <p style={{ margin: "0 0 10px", color: "#cbd5e1", fontSize: 11, fontWeight: 700, letterSpacing: 2.5, textTransform: "uppercase" }}>
                 Saldo a abonar
               </p>
               <div className="debt-amount" style={{
@@ -736,7 +736,7 @@ function ProfileScreen({ customer, onLogout, onUpdateCustomer }) {
                   marginTop: 18, paddingTop: 18, borderTop: "1px solid rgba(255,255,255,0.07)",
                   display: "flex", justifyContent: "center", gap: 10, alignItems: "center",
                 }}>
-                  <span style={{ color: "#475569", fontSize: 14 }}>Del cual, deuda vencida:</span>
+                  <span style={{ color: "#cbd5e1", fontSize: 14 }}>Del cual, deuda vencida:</span>
                   <span style={{ color: "#f87171", fontWeight: 800, fontSize: 16 }}>{formatMoney(dueDebt)}</span>
                 </div>
               )}
@@ -794,7 +794,7 @@ function ProfileScreen({ customer, onLogout, onUpdateCustomer }) {
               display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 14,
             }}>
               <div>
-                <p style={{ margin: "0 0 4px", color: "#475569", fontSize: 11, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase" }}>
+                <p style={{ margin: "0 0 4px", color: "#cbd5e1", fontSize: 11, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase" }}>
                   Estado del servicio
                 </p>
                 <span style={{
@@ -806,7 +806,7 @@ function ProfileScreen({ customer, onLogout, onUpdateCustomer }) {
                 </span>
               </div>
               <div style={{ textAlign: "right" }}>
-                <p style={{ margin: "0 0 2px", color: "#475569", fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase" }}>
+                <p style={{ margin: "0 0 2px", color: "#cbd5e1", fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase" }}>
                   Próxima fecha de corte
                 </p>
                 <p style={{ margin: 0, color: "#cbd5e1", fontSize: 14, fontWeight: 600 }}>
@@ -834,8 +834,8 @@ function ProfileScreen({ customer, onLogout, onUpdateCustomer }) {
                 {cbu && (
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
                     <div>
-                      <span style={{ color: "#475569", fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1 }}>CBU</span>
-                      <p style={{ margin: "2px 0 0", color: "#94a3b8", fontSize: 13, fontFamily: "monospace", letterSpacing: "1px" }}>{cbu}</p>
+                      <span style={{ color: "#cbd5e1", fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1 }}>CBU</span>
+                      <p style={{ margin: "2px 0 0", color: "#cbd5e1", fontSize: 13, fontFamily: "monospace", letterSpacing: "1px" }}>{cbu}</p>
                     </div>
                     <button onClick={() => handleCopy(cbu, "cbu")} style={{
                       display: "flex", alignItems: "center", gap: 7, flexShrink: 0,
@@ -854,8 +854,8 @@ function ProfileScreen({ customer, onLogout, onUpdateCustomer }) {
                   paddingTop: cbu ? "10px" : 0, borderTop: cbu ? "1px solid rgba(255,255,255,0.06)" : "none",
                 }}>
                   <div>
-                    <span style={{ color: "#475569", fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1 }}>Alias</span>
-                    <p style={{ margin: "2px 0 0", color: "#94a3b8", fontSize: 13, fontFamily: "monospace", letterSpacing: "1px" }}>{ALIAS}</p>
+                    <span style={{ color: "#cbd5e1", fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1 }}>Alias</span>
+                    <p style={{ margin: "2px 0 0", color: "#cbd5e1", fontSize: 13, fontFamily: "monospace", letterSpacing: "1px" }}>{ALIAS}</p>
                   </div>
                   <button onClick={() => handleCopy(ALIAS, "alias")} style={{
                     display: "flex", alignItems: "center", gap: 7, flexShrink: 0,
@@ -879,9 +879,9 @@ function ProfileScreen({ customer, onLogout, onUpdateCustomer }) {
               animation: "fadeUp 0.5s ease 0.2s both",
             }}>
               <p style={{ margin: "0 0 3px", color: "#f8fafc", fontWeight: 700, fontSize: 15 }}>📄 Última factura</p>
-              <p style={{ margin: "0 0 14px", color: "#334155", fontSize: 13 }}>Nº de cliente: {customer.code}</p>
+              <p style={{ margin: "0 0 14px", color: "#64748b", fontSize: 13 }}>Nº de cliente: {customer.code}</p>
               {invoiceLoading ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 10, color: "#475569", fontSize: 14 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, color: "#cbd5e1", fontSize: 14 }}>
                   <span style={{
                     width: 16, height: 16, border: "2px solid rgba(255,255,255,0.15)",
                     borderTop: "2px solid #6366f1", borderRadius: "50%",
@@ -905,7 +905,7 @@ function ProfileScreen({ customer, onLogout, onUpdateCustomer }) {
                   <DownloadIcon /> Descargar factura (PDF)
                 </a>
               ) : (
-                <p style={{ margin: 0, color: "#475569", fontSize: 13 }}>
+                <p style={{ margin: 0, color: "#cbd5e1", fontSize: 13 }}>
                   No hay facturas disponibles por el momento.
                 </p>
               )}
@@ -917,7 +917,7 @@ function ProfileScreen({ customer, onLogout, onUpdateCustomer }) {
               borderRadius: 16, padding: "18px 22px", marginBottom: 14,
               animation: "fadeUp 0.5s ease 0.3s both",
             }}>
-              <p style={{ margin: "0 0 12px", color: "#475569", fontSize: 11, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase" }}>
+              <p style={{ margin: "0 0 12px", color: "#cbd5e1", fontSize: 11, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase" }}>
                 Datos de la cuenta
               </p>
               {[
@@ -927,7 +927,7 @@ function ProfileScreen({ customer, onLogout, onUpdateCustomer }) {
                 { label: "Código de cliente", value: customer.code, highlight: true },
               ].filter(Boolean).map(row => (
                 <div key={row.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                  <span style={{ color: "#475569", fontSize: 14 }}>{row.label}</span>
+                  <span style={{ color: "#cbd5e1", fontSize: 14 }}>{row.label}</span>
                   <span style={{ color: row.highlight ? "#10b981" : "#94a3b8", fontSize: 14, fontWeight: row.highlight ? 700 : 500 }}>{row.value}</span>
                 </div>
               ))}
@@ -945,7 +945,7 @@ function ProfileScreen({ customer, onLogout, onUpdateCustomer }) {
             }}>
               <div>
                 <p style={{ margin: "0 0 2px", color: "#cbd5e1", fontWeight: 600, fontSize: 14 }}>¿Necesitás ayuda?</p>
-                <p style={{ margin: 0, color: "#334155", fontSize: 13 }}>Contactá a administración OriNet</p>
+                <p style={{ margin: 0, color: "#64748b", fontSize: 13 }}>Contactá a administración OriNet</p>
               </div>
               <a
                 href={WHATSAPP_URL(wpHelpMsg)}
@@ -976,7 +976,7 @@ function ProfileScreen({ customer, onLogout, onUpdateCustomer }) {
         <p style={{ margin: "0 0 6px", color: "#fff", fontSize: 13 }}>
           © {new Date().getFullYear()} OriNet ISP S.R.L. — Todos los derechos reservados.
         </p>
-        <p style={{ margin: 0, color: "#fff", fontSize: 12 }}>
+        <p style={{ margin: 0, color: "#cbd5e1", fontSize: 12 }}>
           Portal de clientes · Desarrollado por OriNet
         </p>
       </footer>
@@ -1028,7 +1028,7 @@ class ErrorBoundary extends Component {
             <p style={{ color: "#f8fafc", fontSize: 18, fontWeight: 700, margin: "0 0 8px" }}>
               Ocurrió un error inesperado
             </p>
-            <p style={{ color: "#475569", fontSize: 14, margin: "0 0 28px" }}>
+            <p style={{ color: "#cbd5e1", fontSize: 14, margin: "0 0 28px" }}>
               Por favor recargá la página para continuar.
             </p>
             <button
