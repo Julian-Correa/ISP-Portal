@@ -25,16 +25,17 @@ function useIsMobile() {
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────
 const CUT_DAY = 26; // fecha de corte fija
+const RECARGO_RECONEXION = 2000; // recargo por reconexión (modificar acá cuando cambie)
 
 function getServiceStatus(status) {
   const s = (status || "").toLowerCase();
   if (["active", "activo", "enabled"].includes(s))
-    return { label: "Activo",       color: "#10b981", bg: "rgba(16,185,129,0.12)" };
+    return { label: "Activo",       color: "#10b981", bg: "rgba(16,185,129,0.12)", suspended: false };
   if (["blocked", "bloqueado", "block", "suspended", "suspendido", "disabled"].includes(s))
-    return { label: "Suspendido",   color: "#ef4444", bg: "rgba(239,68,68,0.12)" };
+    return { label: "Suspendido",   color: "#ef4444", bg: "rgba(239,68,68,0.12)", suspended: true };
   if (["no_service"].includes(s))
-    return { label: "Sin servicio", color: "#f59e0b", bg: "rgba(245,158,11,0.12)" };
-  return   { label: status || "—",  color: "#64748b", bg: "rgba(100,116,139,0.12)" };
+    return { label: "Sin servicio", color: "#f59e0b", bg: "rgba(245,158,11,0.12)", suspended: false };
+  return   { label: status || "—",  color: "#64748b", bg: "rgba(100,116,139,0.12)", suspended: false };
 }
 
 function getCutoffDate() {
@@ -46,8 +47,11 @@ function getCutoffDate() {
 
 // ─── CONFIGURACIÓN GENERAL ─────────────────────────────────────────────────
 const WHATSAPP_NUMBER = "541130921454";
+const WHATSAPP_SOPORTE = "541171812782";
 const WHATSAPP_URL = (msg = "") =>
   `https://wa.me/${WHATSAPP_NUMBER}${msg ? `?text=${encodeURIComponent(msg)}` : ""}`;
+const WHATSAPP_SOPORTE_URL = (msg = "") =>
+  `https://wa.me/${WHATSAPP_SOPORTE}${msg ? `?text=${encodeURIComponent(msg)}` : ""}`;
 
 // ─── CONFIGURACIÓN DE API ──────────────────────────────────────────────────
 // ─── CONFIGURACIÓN DE API ──────────────────────────────────────────────────
@@ -626,7 +630,10 @@ function ProfileScreen({ customer, onLogout, onUpdateCustomer }) {
 
   const debt = parseFloat(customer.debt) || 0;
   const dueDebt = parseFloat(customer.duedebt) || 0;
-  const hasDebt = debt > 0;
+  const svcStatus = getServiceStatus(customer.status);
+  const recargo = svcStatus.suspended ? RECARGO_RECONEXION : 0;
+  const totalDebt = debt + recargo;
+  const hasDebt = totalDebt > 0;
 
   // Cargar URL de la última factura al montar
   useEffect(() => {
@@ -636,8 +643,8 @@ function ProfileScreen({ customer, onLogout, onUpdateCustomer }) {
       .finally(() => setInvoiceLoading(false));
   }, [customer.id]);
 
-  const debtColor = !hasDebt ? "#10b981" : debt > 5000 ? "#ef4444" : "#f59e0b";
-  const debtBg    = !hasDebt ? "rgba(16,185,129,0.12)" : debt > 5000 ? "rgba(239,68,68,0.12)" : "rgba(245,158,11,0.12)";
+  const debtColor = !hasDebt ? "#10b981" : totalDebt > 5000 ? "#ef4444" : "#f59e0b";
+  const debtBg    = !hasDebt ? "rgba(16,185,129,0.12)" : totalDebt > 5000 ? "rgba(239,68,68,0.12)" : "rgba(245,158,11,0.12)";
 
   const wpPaymentMsg = `Hola OriNet! Soy ${formatName(customer.name)}, DNI ${customer.doc_number}, código de cliente ${customer.code}. Les envío el comprobante de pago.`;
   const wpHelpMsg    = `Hola OriNet! Soy ${formatName(customer.name)}, DNI ${customer.doc_number}. Necesito ayuda con mi cuenta.`;
@@ -647,8 +654,6 @@ function ProfileScreen({ customer, onLogout, onUpdateCustomer }) {
   const cbu     = cbuList[0]?.cbu || cbuList[0]?.number || null;
   const ALIAS   = "orinet.isp.internet";
 
-  // Estado del servicio
-  const svcStatus = getServiceStatus(customer.status);
   const cutoffDate = getCutoffDate();
 
   const handleCopy = (text, key) => {
@@ -722,7 +727,7 @@ function ProfileScreen({ customer, onLogout, onUpdateCustomer }) {
                 letterSpacing: "-3px", lineHeight: 1,
                 textShadow: `0 0 40px ${debtColor}40`,
               }}>
-                {formatMoney(debt)}
+                {formatMoney(totalDebt)}
               </div>
               <div style={{
                 display: "inline-block", marginTop: 14,
@@ -731,6 +736,24 @@ function ProfileScreen({ customer, onLogout, onUpdateCustomer }) {
               }}>
                 {!hasDebt ? "✓ ¡Estás al día! Sin deuda pendiente." : "⚠ Tenés un saldo pendiente de pago."}
               </div>
+
+              {/* Desglose cuando hay recargo por reconexión */}
+              {recargo > 0 && (
+                <div style={{
+                  marginTop: 18, paddingTop: 18, borderTop: "1px solid rgba(255,255,255,0.07)",
+                  display: "flex", flexDirection: "column", gap: 8, alignItems: "center",
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", width: "100%", maxWidth: 280 }}>
+                    <span style={{ color: "#cbd5e1", fontSize: 13 }}>Deuda</span>
+                    <span style={{ color: "#cbd5e1", fontSize: 13, fontWeight: 600 }}>{formatMoney(debt)}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", width: "100%", maxWidth: 280 }}>
+                    <span style={{ color: "#f87171", fontSize: 13 }}>Recargo por reconexión</span>
+                    <span style={{ color: "#f87171", fontSize: 13, fontWeight: 600 }}>+ {formatMoney(recargo)}</span>
+                  </div>
+                </div>
+              )}
+
               {dueDebt > 0 && (
                 <div style={{
                   marginTop: 18, paddingTop: 18, borderTop: "1px solid rgba(255,255,255,0.07)",
@@ -813,6 +836,48 @@ function ProfileScreen({ customer, onLogout, onUpdateCustomer }) {
                   📅 {cutoffDate}
                 </p>
               </div>
+            </div>
+
+            {/* ── SOPORTE TÉCNICO ── */}
+            <div style={{
+              background: "linear-gradient(135deg, rgba(56,189,248,0.08), rgba(56,189,248,0.03))",
+              border: "1px solid rgba(56,189,248,0.2)", borderRadius: 20,
+              padding: "20px 24px", marginBottom: 14,
+              animation: "fadeUp 0.5s ease 0.22s both",
+              display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 14,
+            }}>
+              <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
+                <div style={{
+                  width: 42, height: 42, borderRadius: 11, flexShrink: 0,
+                  background: "rgba(56,189,248,0.12)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.12 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3 1.18h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.68 2.81a2 2 0 0 1-.45 2.11L7.09 8.91a16 16 0 0 0 5.61 5.61l1.27-1.27a2 2 0 0 1 2.11-.45c.9.32 1.85.55 2.81.68A2 2 0 0 1 22 16.92z"/>
+                  </svg>
+                </div>
+                <div>
+                  <p style={{ margin: "0 0 2px", color: "#7dd3fc", fontWeight: 700, fontSize: 14 }}>Soporte técnico</p>
+                  <p style={{ margin: 0, color: "#64748b", fontSize: 12 }}>Sin servicio o problemas de conexión</p>
+                </div>
+              </div>
+              <a
+                href={WHATSAPP_SOPORTE_URL(
+                  `Hola, soy ${formatName(customer.name)}, DNI ${customer.doc_number}, código de cliente ${customer.code}, domicilio ${customer.address}. Estoy comunicándome para reportar que no cuento con servicio de internet y solicitar asistencia técnica.`
+                )}
+                target="_blank" rel="noopener noreferrer"
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 8, flexShrink: 0,
+                  background: "rgba(37,211,102,0.09)", border: "1px solid rgba(37,211,102,0.22)",
+                  color: "#4ade80", borderRadius: 10, padding: "10px 18px",
+                  fontSize: 14, fontWeight: 600, textDecoration: "none", fontFamily: "inherit",
+                  whiteSpace: "nowrap", transition: "all 0.2s",
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = "rgba(37,211,102,0.16)"}
+                onMouseLeave={e => e.currentTarget.style.background = "rgba(37,211,102,0.09)"}
+              >
+                <WhatsAppIcon size={17} /> Contactar soporte
+              </a>
             </div>
 
           </div>{/* fin columna izquierda */}
