@@ -13,16 +13,6 @@ function GlobalStyles() {
   );
 }
 
-function useIsMobile() {
-  const [mobile, setMobile] = useState(() => typeof window !== "undefined" && window.innerWidth < 600);
-  useEffect(() => {
-    const fn = () => setMobile(window.innerWidth < 600);
-    window.addEventListener("resize", fn);
-    return () => window.removeEventListener("resize", fn);
-  }, []);
-  return mobile;
-}
-
 // ─── HELPERS ──────────────────────────────────────────────────────────────
 const CUT_DAY = 26; // fecha de corte fija
 const RECARGO_RECONEXION = 2000; // recargo por reconexión (modificar acá cuando cambie)
@@ -60,6 +50,9 @@ const API_KEY    = "a126ac03-e7e0-46c6-8d20-0710ad5fd627";
 const CLIENT_ID  = "302";
 const API_USER   = "apinew";
 const API_PASS   = "G)exba87wTJc{=8VV.h#4Ef]";
+
+// Si existe este backend intermedio, reducimos requests al ISP y protegemos credenciales en servidor
+const PORTAL_API_BASE = import.meta.env.VITE_PORTAL_API_BASE || "";
 
 // Token en memoria — se reutiliza durante la sesión
 let cachedToken = null;
@@ -173,7 +166,7 @@ async function fetchLastInvoiceUrl(customer) {
   console.log("Respuesta factura (raw):", text);
 
   // Si es una URL directa
-  const trimmed = text.trim().replace(/^["'\[\{]+|["'\]\}]+$/g, "");
+  const trimmed = text.trim().replace(/^["'[{]+/, "").replace(/["'}\]]+$/, "");
   if (trimmed.startsWith("http")) return trimmed;
 
   // Intentar parsear como JSON por si acaso
@@ -345,6 +338,34 @@ function WhatsAppIcon({ size = 20 }) {
   );
 }
 
+
+async function fetchCustomerSummaryByDNI(dni) {
+  if (PORTAL_API_BASE) {
+    try {
+      const res = await fetch(`${PORTAL_API_BASE}/customer-summary?dni=${dni}`, {
+        method: "GET",
+        headers: { "Accept": "application/json" },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.customer?.id) {
+          return {
+            customer: data.customer,
+            invoiceUrl: data.invoiceUrl || null,
+          };
+        }
+      }
+    } catch (err) {
+      console.warn("Fallo endpoint agregado, uso fallback directo a ISP:", err);
+    }
+  }
+
+  const customer = await fetchCustomerByDNI(dni);
+  const invoiceUrl = await fetchLastInvoiceUrl(customer).catch(() => null);
+  return { customer, invoiceUrl };
+}
+
 // ─── LOGIN ─────────────────────────────────────────────────────────────────
 function LoginScreen({ onLogin }) {
   const [dni, setDni] = useState("");
@@ -360,8 +381,8 @@ function LoginScreen({ onLogin }) {
     setError("");
     setLoading(true);
     try {
-      const customer = await fetchCustomerByDNI(clean);
-      onLogin(customer);
+      const summary = await fetchCustomerSummaryByDNI(clean);
+      onLogin(summary);
     } catch {
       setError("No encontramos una cuenta asociada a ese DNI. Verificá e intentá nuevamente.");
     } finally {
@@ -520,7 +541,7 @@ function EmailCard({ customer, onUpdateCustomer }) {
       onUpdateCustomer(updatedCustomer);
 
       setTimeout(() => setStatus(null), 3500);
-    } catch (e) {
+    } catch {
       setStatus("error");
       setErrorMsg("No se pudo guardar. Intentá de nuevo.");
     }
@@ -623,10 +644,10 @@ function EmailCard({ customer, onUpdateCustomer }) {
 }
 
 // ─── PERFIL ────────────────────────────────────────────────────────────────
-function ProfileScreen({ customer, onLogout, onUpdateCustomer }) {
+function ProfileScreen({ customer, invoiceUrl: initialInvoiceUrl, onLogout, onUpdateCustomer }) {
   const [copied, setCopied] = useState(null);
-  const [invoiceUrl, setInvoiceUrl]   = useState(null);
-  const [invoiceLoading, setInvoiceLoading] = useState(true);
+  const [invoiceUrl, setInvoiceUrl] = useState(initialInvoiceUrl || null);
+  const [invoiceLoading, setInvoiceLoading] = useState(!initialInvoiceUrl);
 
   const debt = parseFloat(customer.debt) || 0;
   const dueDebt = parseFloat(customer.duedebt) || 0;
@@ -635,13 +656,15 @@ function ProfileScreen({ customer, onLogout, onUpdateCustomer }) {
   const totalDebt = debt + recargo;
   const hasDebt = totalDebt > 0;
 
-  // Cargar URL de la última factura al montar
+  // Si no vino factura desde el endpoint agregado, la buscamos en fallback.
   useEffect(() => {
+    if (initialInvoiceUrl) return;
+
     fetchLastInvoiceUrl(customer)
       .then(url => setInvoiceUrl(url))
       .catch(err => { console.warn("Factura no disponible:", err); setInvoiceUrl(null); })
       .finally(() => setInvoiceLoading(false));
-  }, [customer.id]);
+  }, [customer, initialInvoiceUrl]);
 
   const debtColor = !hasDebt ? "#10b981" : totalDebt > 5000 ? "#ef4444" : "#f59e0b";
   const debtBg    = !hasDebt ? "rgba(16,185,129,0.12)" : totalDebt > 5000 ? "rgba(239,68,68,0.12)" : "rgba(245,158,11,0.12)";
@@ -1117,17 +1140,23 @@ class ErrorBoundary extends Component {
 
 // ─── APP ──────────────────────────────────────────────────────────────────
 export default function App() {
-  const [customer, setCustomer] = useState(null);
+  const [session, setSession] = useState(null);
+
+  const updateCustomer = (nextCustomer) => {
+    setSession(prev => (prev ? { ...prev, customer: nextCustomer } : prev));
+  };
+
   return (
     <ErrorBoundary>
       <GlobalStyles />
-      {customer
+      {session
         ? <ProfileScreen
-            customer={customer}
-            onUpdateCustomer={setCustomer}
-            onLogout={() => setCustomer(null)}
+            customer={session.customer}
+            invoiceUrl={session.invoiceUrl}
+            onUpdateCustomer={updateCustomer}
+            onLogout={() => setSession(null)}
           />
-        : <LoginScreen onLogin={setCustomer} />}
+        : <LoginScreen onLogin={setSession} />}
     </ErrorBoundary>
   );
 }
