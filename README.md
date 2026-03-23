@@ -78,6 +78,26 @@ Ejemplo de respuesta:
 
 El frontend ahora usa `VITE_PORTAL_API_BASE` para llamar ese endpoint agregado y, si falla, hace fallback al flujo anterior directo al ISP.
 
+
+## Estructura backend (Controller / Service / Repository)
+
+Para escalar el proxy, el backend quedó separado en capas:
+
+- `server/controllers/`: recibe HTTP, valida entrada/salida y códigos de estado.
+- `server/services/`: orquesta reglas de negocio (cache, flujo de consulta).
+- `server/repositories/`: encapsula acceso a ISPCube (token, customer, factura).
+- `server/lib/`: utilidades técnicas compartidas (cache Redis + memoria).
+- `server/config/`: variables de entorno y validaciones.
+- `server/routes/`: mapeo de endpoints a controllers.
+
+Flujo actual para `GET /customer-summary`:
+
+1. Route -> `customerController.getCustomerSummary`
+2. Controller -> `customerSummaryService.getSummaryByDni`
+3. Service -> cache (`HIT`) o `ispRepository` (`MISS`)
+4. Repository -> llamadas a ISPCube
+5. Service devuelve payload y controller responde HTTP
+
 ## Deploy
 
 ```bash
