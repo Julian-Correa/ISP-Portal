@@ -20,8 +20,9 @@ Portal web para que los clientes del ISP puedan consultar su estado de cuenta, d
 
 ## Tecnologías
 
-- React 18 + Vite
-- CSS-in-JS con media queries para responsividad
+- React 19 + Vite
+- Node.js + Express para endpoint agregado
+- Redis (opcional, con fallback en memoria)
 - API ISPCube (`https://online25.ispcube.com/api`)
 
 ---
@@ -29,20 +30,73 @@ Portal web para que los clientes del ISP puedan consultar su estado de cuenta, d
 ## Instalación
 
 ```bash
-# 1. Crear proyecto con Vite
-npm create vite@latest orinet-portal -- --template react
-cd orinet-portal
-
-# 2. Instalar dependencias
+# 1. Instalar dependencias
 npm install
 
-# 3. Reemplazar src/App.jsx con el archivo isp-portal.jsx
+# 2. Copiar variables de entorno
+cp .env.example .env
 
-# 4. Levantar servidor de desarrollo
+# 3. Completar credenciales ISP_* en .env
+```
+
+### Desarrollo local (frontend + endpoint agregado)
+
+```bash
+# Terminal 1: backend agregado (cache Redis/memoria)
+npm run server
+
+# Terminal 2: frontend
 npm run dev
 ```
 
 ---
+
+
+## Reducción de requests al ISP (cache + endpoint agregado)
+
+Se agregó un backend intermedio en `server/index.js` con endpoint:
+
+- `GET /customer-summary?dni=12345678`
+
+Ese endpoint:
+
+1. Obtiene/reutiliza token de ISPCube (cacheado por TTL).
+2. Consulta cliente por DNI.
+3. Consulta última factura del cliente.
+4. Devuelve un único payload para el frontend.
+5. Cachea respuesta por DNI en Redis (`x-cache: HIT/MISS`).
+
+Ejemplo de respuesta:
+
+```json
+{
+  "customer": { "id": 123, "name": "..." },
+  "invoiceUrl": "https://...pdf",
+  "generatedAt": "2026-03-23T12:00:00.000Z"
+}
+```
+
+El frontend ahora usa `VITE_PORTAL_API_BASE` para llamar ese endpoint agregado y, si falla, hace fallback al flujo anterior directo al ISP.
+
+
+## Estructura backend (Controller / Service / Repository)
+
+Para escalar el proxy, el backend quedó separado en capas:
+
+- `server/controllers/`: recibe HTTP, valida entrada/salida y códigos de estado.
+- `server/services/`: orquesta reglas de negocio (cache, flujo de consulta).
+- `server/repositories/`: encapsula acceso a ISPCube (token, customer, factura).
+- `server/lib/`: utilidades técnicas compartidas (cache Redis + memoria).
+- `server/config/`: variables de entorno y validaciones.
+- `server/routes/`: mapeo de endpoints a controllers.
+
+Flujo actual para `GET /customer-summary`:
+
+1. Route -> `customerController.getCustomerSummary`
+2. Controller -> `customerSummaryService.getSummaryByDni`
+3. Service -> cache (`HIT`) o `ispRepository` (`MISS`)
+4. Repository -> llamadas a ISPCube
+5. Service devuelve payload y controller responde HTTP
 
 ## Deploy
 
