@@ -1065,7 +1065,7 @@ function ProfileScreen({ customer, invoiceUrl: initialInvoiceUrl, onLogout, onUp
           © {new Date().getFullYear()} OriNet ISP S.R.L. — Todos los derechos reservados.
         </p>
         <p style={{ margin: 0, color: "#cbd5e1", fontSize: 12 }}>
-          Portal de clientes · Desarrollado por OriNet
+          Portal de clientes · Desarrollado por Correa Julián
         </p>
       </footer>
 
