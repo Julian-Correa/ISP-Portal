@@ -490,7 +490,7 @@ function LoginScreen({ onLogin }) {
           >
             <WhatsAppIcon size={16} /> Contactar por WhatsApp
           </a>
-          <p style={{ margin: "0 0 10px", color: "#64748b", fontSize: 12 }}>
+          <p style={{ margin: "0 0 10px",padding:"5px 0px" ,color: "#64748b", fontSize: 12 }}>
             Desarrollado por Correa Julián.
           </p>
         </div>
