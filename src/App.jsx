@@ -761,7 +761,7 @@ function ProfileScreen({ customer, invoiceUrl: initialInvoiceUrl, planInfo: init
   const debtColor = !hasDebt ? "#10b981" : totalDebt > 5000 ? "#ef4444" : "#f59e0b";
   const debtBg    = !hasDebt ? "rgba(16,185,129,0.12)" : totalDebt > 5000 ? "rgba(239,68,68,0.12)" : "rgba(245,158,11,0.12)";
 
-  const wpPaymentMsg = `Hola OriNet! Soy ${formatName(customer.name)}, DNI ${customer.doc_number}, código de cliente ${customer.code}. Les envío el comprobante de pago.`;
+  const wpPaymentMsg = `Hola OriNet! Soy ${formatName(customer.name)}, DNI ${customer.doc_number}, código de cliente ${customer.code}. Estado del servicio: ${svcStatus.suspended ? "Bloqueado" : "Habilitado"}. Les envío el comprobante de pago.`;
   const wpHelpMsg    = `Hola OriNet! Soy ${formatName(customer.name)}, DNI ${customer.doc_number}. Necesito ayuda con mi cuenta.`;
 
   // CBU desde la API + alias fijo
