@@ -13,6 +13,14 @@ export class CustomerSummaryService {
     return dni.length >= 7 && dni.length <= 8;
   }
 
+  formatMoney(value) {
+    return new Intl.NumberFormat("es-AR", {
+      style: "currency",
+      currency: "ARS",
+      minimumFractionDigits: 2,
+    }).format(parseFloat(value) || 0);
+  }
+
   async getSummaryByDni(rawDni) {
     const dni = this.sanitizeDni(rawDni);
     if (!this.isValidDni(dni)) {
@@ -33,9 +41,15 @@ export class CustomerSummaryService {
     }
 
     const invoiceUrl = await this.ispRepository.findLastInvoiceUrl(customer.id, token);
+    const connection = await this.ispRepository.findConnectionByCustomer(customer, token);
+    const plan = await this.ispRepository.findPlanById(connection?.plan_id, token);
     const payload = {
       customer,
       invoiceUrl,
+      planInfo: {
+        plan: plan?.name || (connection?.plan_id ? `Plan ${connection.plan_id}` : "No informado"),
+        price: plan?.price ? this.formatMoney(plan.price) : "No informado",
+      },
       generatedAt: new Date().toISOString(),
     };
 

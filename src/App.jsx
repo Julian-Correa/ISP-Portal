@@ -188,6 +188,68 @@ async function fetchLastInvoiceUrl(customer) {
   return null;
 }
 
+async function fetchCustomerConnection(customer) {
+  const token = await getToken();
+  const headers = {
+    "Content-Type":  "application/json",
+    "Accept":        "application/json",
+    "api-key":       API_KEY,
+    "client-id":     CLIENT_ID,
+    "login-type":    "api",
+    "username":      API_USER,
+    "Authorization": `Bearer ${token}`,
+  };
+
+  const searches = [
+    { customer_id: String(customer.id) },
+    { doc_number: String(customer.doc_number || "") },
+    { code: String(customer.code || "") },
+    {
+      customer_id: String(customer.id),
+      doc_number: String(customer.doc_number || ""),
+      code: String(customer.code || ""),
+    },
+  ];
+
+  for (const search of searches) {
+    const params = new URLSearchParams(
+      Object.entries(search).filter(([, value]) => value)
+    );
+
+    const res = await fetch(`${API_BASE}/connection?${params}`, { method: "GET", headers });
+    if (!res.ok) continue;
+
+    const data = await res.json();
+    const connections = Array.isArray(data) ? data : data?.id ? [data] : [];
+    const connection = connections.find(item => item?.plan_id) || connections[0];
+    if (connection) return connection;
+  }
+
+  return null;
+}
+
+async function fetchPlanById(planId) {
+  if (!planId) return null;
+
+  const token = await getToken();
+  const headers = {
+    "Content-Type":  "application/json",
+    "Accept":        "application/json",
+    "api-key":       API_KEY,
+    "client-id":     CLIENT_ID,
+    "login-type":    "api",
+    "username":      API_USER,
+    "Authorization": `Bearer ${token}`,
+  };
+
+  const res = await fetch(`${API_BASE}/plans/plans_list`, { method: "GET", headers });
+  if (!res.ok) return null;
+
+  const data = await res.json();
+  const plans = Array.isArray(data) ? data : [];
+  return plans.find(plan => String(plan.id) === String(planId)) || null;
+}
+
 // Actualiza o crea el email de contacto del cliente en ISPCube
 async function updateCustomerEmail(customer, email) {
   const token = await getToken();
@@ -234,6 +296,11 @@ const formatMoney = (val) =>
 
 const formatName = (name) =>
   name?.split(" ").map(w => w.charAt(0) + w.slice(1).toLowerCase()).join(" ") || "";
+
+const getConnectionPlanInfo = (connection, plan) => ({
+  plan: plan?.name || (connection?.plan_id ? `Plan ${connection.plan_id}` : "No informado"),
+  price: plan?.price ? formatMoney(plan.price) : "No informado",
+});
 
 // ─── LOGO SVG ORINET ──────────────────────────────────────────────────────
 function OriNetLogo({ size = "large" }) {
@@ -338,6 +405,11 @@ function WhatsAppIcon({ size = 20 }) {
   );
 }
 
+async function fetchCustomerPlanInfo(customer) {
+  const connection = await fetchCustomerConnection(customer);
+  const plan = await fetchPlanById(connection?.plan_id);
+  return getConnectionPlanInfo(connection, plan);
+}
 
 async function fetchCustomerSummaryByDNI(dni) {
   if (PORTAL_API_BASE) {
@@ -350,9 +422,11 @@ async function fetchCustomerSummaryByDNI(dni) {
       if (res.ok) {
         const data = await res.json();
         if (data?.customer?.id) {
+          const planInfo = data.planInfo || await fetchCustomerPlanInfo(data.customer).catch(() => getConnectionPlanInfo(null));
           return {
             customer: data.customer,
             invoiceUrl: data.invoiceUrl || null,
+            planInfo,
           };
         }
       }
@@ -363,7 +437,8 @@ async function fetchCustomerSummaryByDNI(dni) {
 
   const customer = await fetchCustomerByDNI(dni);
   const invoiceUrl = await fetchLastInvoiceUrl(customer).catch(() => null);
-  return { customer, invoiceUrl };
+  const planInfo = await fetchCustomerPlanInfo(customer).catch(() => getConnectionPlanInfo(null));
+  return { customer, invoiceUrl, planInfo };
 }
 
 // ─── LOGIN ─────────────────────────────────────────────────────────────────
@@ -654,7 +729,7 @@ function EmailCard({ customer, onUpdateCustomer }) {
 }
 
 // ─── PERFIL ────────────────────────────────────────────────────────────────
-function ProfileScreen({ customer, invoiceUrl: initialInvoiceUrl, onLogout, onUpdateCustomer }) {
+function ProfileScreen({ customer, invoiceUrl: initialInvoiceUrl, planInfo: initialPlanInfo, onLogout, onUpdateCustomer }) {
   const [copied, setCopied] = useState(null);
   const [invoiceUrl, setInvoiceUrl] = useState(initialInvoiceUrl || null);
   const [invoiceLoading, setInvoiceLoading] = useState(!initialInvoiceUrl);
@@ -662,6 +737,7 @@ function ProfileScreen({ customer, invoiceUrl: initialInvoiceUrl, onLogout, onUp
   const debt = parseFloat(customer.debt) || 0;
   const dueDebt = parseFloat(customer.duedebt) || 0;
   const svcStatus = getServiceStatus(customer.status);
+  const planInfo = initialPlanInfo || getConnectionPlanInfo(null);
   const recargo = svcStatus.suspended ? RECARGO_RECONEXION : 0;
   const totalDebt = debt + recargo;
   const hasDebt = totalDebt > 0;
@@ -918,6 +994,19 @@ function ProfileScreen({ customer, invoiceUrl: initialInvoiceUrl, onLogout, onUp
           {/* COLUMNA DERECHA */}
           <div className="profile-col">
 
+            {/* PLAN */}
+            <div style={{
+              background: "rgba(255,255,255,0.04)", backdropFilter: "blur(12px)",
+              border: "1px solid rgba(255,255,255,0.08)", borderRadius: 20,
+              padding: "20px 24px", marginBottom: 14,
+              animation: "fadeUp 0.5s ease 0.2s both",
+            }}>
+              <p style={{ margin: "0 0 8px", color: "#f8fafc", fontWeight: 700, fontSize: 15 }}>Plan contratado</p>
+              <p style={{ margin: 0, color: "#cbd5e1", fontSize: 14, lineHeight: 1.5 }}>
+                Su plan es <span style={{ color: "#f8fafc", fontWeight: 700 }}>{planInfo.plan}</span> - <span style={{ color: "#10b981", fontWeight: 800 }}>{planInfo.price}</span>
+              </p>
+            </div>
+
             {/* ── CBU / ALIAS ── */}
             <div style={{
               background: "rgba(255,255,255,0.04)", backdropFilter: "blur(12px)",
@@ -1163,6 +1252,7 @@ export default function App() {
         ? <ProfileScreen
             customer={session.customer}
             invoiceUrl={session.invoiceUrl}
+            planInfo={session.planInfo}
             onUpdateCustomer={updateCustomer}
             onLogout={() => setSession(null)}
           />

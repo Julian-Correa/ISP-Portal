@@ -96,4 +96,50 @@ export class IspRepository {
 
     return null;
   }
+
+  async findConnectionByCustomer(customer, token) {
+    const searches = [
+      { customer_id: String(customer.id) },
+      { doc_number: String(customer.doc_number || "") },
+      { code: String(customer.code || "") },
+      {
+        customer_id: String(customer.id),
+        doc_number: String(customer.doc_number || ""),
+        code: String(customer.code || ""),
+      },
+    ];
+
+    for (const search of searches) {
+      const params = new URLSearchParams(
+        Object.entries(search).filter(([, value]) => value)
+      );
+
+      const response = await fetch(`${this.isp.apiBase}/connection?${params}`, {
+        headers: this.headers(token),
+      });
+
+      if (!response.ok) continue;
+
+      const data = await response.json();
+      const connections = Array.isArray(data) ? data : data?.id ? [data] : [];
+      const connection = connections.find((item) => item?.plan_id) || connections[0];
+      if (connection) return connection;
+    }
+
+    return null;
+  }
+
+  async findPlanById(planId, token) {
+    if (!planId) return null;
+
+    const response = await fetch(`${this.isp.apiBase}/plans/plans_list`, {
+      headers: this.headers(token),
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    const plans = Array.isArray(data) ? data : [];
+    return plans.find((plan) => String(plan.id) === String(planId)) || null;
+  }
 }
