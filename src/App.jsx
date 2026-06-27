@@ -51,252 +51,64 @@ const POPUP_CONFIG = {
 
 // ─── CONFIGURACIÓN DE API ──────────────────────────────────────────────────
 // ─── CONFIGURACIÓN DE API ──────────────────────────────────────────────────
-const API_BASE   = "https://online25.ispcube.com/api";
-const API_KEY    = "a126ac03-e7e0-46c6-8d20-0710ad5fd627";
-const CLIENT_ID  = "302";
-const API_USER   = "apinew";
-const API_PASS   = "G)exba87wTJc{=8VV.h#4Ef]";
-
-// Si existe este backend intermedio, reducimos requests al ISP y protegemos credenciales en servidor
 const PORTAL_API_BASE = import.meta.env.VITE_PORTAL_API_BASE || "";
 
-// Token en memoria — se reutiliza durante la sesión
-let cachedToken = null;
-
-async function getToken() {
-  if (cachedToken) return cachedToken;
-
-  const res = await fetch(`${API_BASE}/sanctum/token`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Accept":       "application/json",
-      "api-key":      API_KEY,
-      "client-id":    CLIENT_ID,
-      "login-type":   "api",
-    },
-    body: JSON.stringify({ username: API_USER, password: API_PASS }),
-  });
-
-  if (!res.ok) throw new Error(`Error de autenticación con la API (${res.status})`);
-  const data = await res.json();
-  // ISPCube devuelve { token: "..." } o { access_token: "..." }
-  cachedToken = data.token || data.access_token;
-  if (!cachedToken) throw new Error("No se recibió token de la API");
-  return cachedToken;
+function requirePortalApiBase() {
+  if (!PORTAL_API_BASE) {
+    throw new Error("Falta configurar VITE_PORTAL_API_BASE.");
+  }
 }
 
-async function fetchCustomerByDNI(dni) {
-  let token;
+async function readPortalJson(response) {
+  let data = null;
   try {
-    token = await getToken();
-  } catch (err) {
-    console.error("Error obteniendo token:", err);
-    throw new Error("No se pudo conectar con el servidor. Contactá a soporte.");
+    data = await response.json();
+  } catch {
+    // El backend debe responder JSON, pero la UI no debe exponer errores crudos.
   }
 
-  let response;
-  try {
-    response = await fetch(
-      `${API_BASE}/customer?doc_number=${dni}&deleted=false&temporary=false`,
-      {
-        method: "GET",
-        headers: {
-          "Content-Type":  "application/json",
-          "Accept":        "application/json",
-          "api-key":       API_KEY,
-          "client-id":     CLIENT_ID,
-          "login-type":    "api",
-          "username":      API_USER,
-          "Authorization": `Bearer ${token}`,
-        },
-      }
-    );
-  } catch (networkErr) {
-    console.error("Error de red:", networkErr);
-    throw new Error("No se pudo conectar con el servidor. Verificá tu conexión.");
+  if (!response.ok) {
+    throw new Error(data?.error || `Error del servidor (${response.status})`);
   }
 
-  // Si el token expiró, limpiamos caché y tiramos error claro
-  if (response.status === 401) {
-    cachedToken = null;
-    throw new Error("Sesión expirada. Recargá la página e intentá de nuevo.");
-  }
-  if (response.status === 404) throw new Error("DNI no encontrado");
-  if (!response.ok) throw new Error(`Error del servidor (${response.status}). Intentá más tarde.`);
-
-  let data;
-  try { data = await response.json(); } catch {
-    throw new Error("La respuesta del servidor no es válida.");
-  }
-
-  if (Array.isArray(data)) {
-    if (data.length === 0) throw new Error("No encontramos una cuenta asociada a ese DNI.");
-    return data[0];
-  }
-  if (!data || !data.id) throw new Error("No encontramos una cuenta asociada a ese DNI.");
   return data;
 }
 
-// Trae la última factura del cliente usando el endpoint real de ISPCube
-async function fetchLastInvoiceUrl(customer) {
-  const token = await getToken();
-  const headers = {
-    "Content-Type":  "application/json",
-    "Accept":        "application/json",
-    "api-key":       API_KEY,
-    "client-id":     CLIENT_ID,
-    "login-type":    "api",
-    "username":      API_USER,
-    "Authorization": `Bearer ${token}`,
-  };
+async function fetchCustomerSummaryByDNI(dni) {
+  requirePortalApiBase();
 
-  // Sin filtro de tipo — traemos cualquier factura del cliente
-  const params = new URLSearchParams({
-    customer_id:  customer.id,
-    monthly_bill: "true",
-    canceled:     "false",
+  const res = await fetch(`${PORTAL_API_BASE}/customer-summary?dni=${dni}`, {
+    method: "GET",
+    headers: { Accept: "application/json" },
   });
+  const data = await readPortalJson(res);
 
-  const url = `${API_BASE}/bills/last_bill_api?${params}`;
-  const res = await fetch(url, { method: "GET", headers });
-
-  if (!res.ok) {
-    const errText = await res.text();
-    console.warn("Error factura:", res.status, errText);
-    return null;
+  if (!data?.customer?.id) {
+    throw new Error("No encontramos una cuenta asociada a ese DNI.");
   }
 
-  // ISPCube devuelve la URL directamente como texto plano (no JSON)
-  const text = await res.text();
-  console.log("Respuesta factura (raw):", text);
-
-  // Si es una URL directa
-  const trimmed = text.trim().replace(/^["'[{]+/, "").replace(/["'}\]]+$/, "");
-  if (trimmed.startsWith("http")) return trimmed;
-
-  // Intentar parsear como JSON por si acaso
-  try {
-    const data = JSON.parse(text);
-    if (Array.isArray(data) && data.length > 0) {
-      const item = data[0];
-      if (typeof item === "string") return item;
-      const values = Object.values(item);
-      if (values.length > 0 && typeof values[0] === "string") return values[0];
-      const keys = Object.keys(item);
-      if (keys.length > 0 && keys[0].startsWith("http")) return keys[0];
-    }
-    if (data && typeof data === "object") {
-      return data.url || data.pdf_url || data.link || null;
-    }
-  } catch { /* no era JSON, ya manejado arriba */ }
-
-  return null;
-}
-
-async function fetchCustomerConnection(customer) {
-  const token = await getToken();
-  const headers = {
-    "Content-Type":  "application/json",
-    "Accept":        "application/json",
-    "api-key":       API_KEY,
-    "client-id":     CLIENT_ID,
-    "login-type":    "api",
-    "username":      API_USER,
-    "Authorization": `Bearer ${token}`,
+  return {
+    customer: data.customer,
+    invoiceUrl: data.invoiceUrl || null,
+    planInfo: data.planInfo || getConnectionPlanInfo(null),
   };
-
-  const searches = [
-    { customer_id: String(customer.id) },
-    { doc_number: String(customer.doc_number || "") },
-    { code: String(customer.code || "") },
-    {
-      customer_id: String(customer.id),
-      doc_number: String(customer.doc_number || ""),
-      code: String(customer.code || ""),
-    },
-  ];
-
-  for (const search of searches) {
-    const params = new URLSearchParams(
-      Object.entries(search).filter(([, value]) => value)
-    );
-
-    const res = await fetch(`${API_BASE}/connection?${params}`, { method: "GET", headers });
-    if (!res.ok) continue;
-
-    const data = await res.json();
-    const connections = Array.isArray(data) ? data : data?.id ? [data] : [];
-    const connection = connections.find(item => item?.plan_id) || connections[0];
-    if (connection) return connection;
-  }
-
-  return null;
 }
 
-async function fetchPlanById(planId) {
-  if (!planId) return null;
-
-  const token = await getToken();
-  const headers = {
-    "Content-Type":  "application/json",
-    "Accept":        "application/json",
-    "api-key":       API_KEY,
-    "client-id":     CLIENT_ID,
-    "login-type":    "api",
-    "username":      API_USER,
-    "Authorization": `Bearer ${token}`,
-  };
-
-  const res = await fetch(`${API_BASE}/plans/plans_list`, { method: "GET", headers });
-  if (!res.ok) return null;
-
-  const data = await res.json();
-  const plans = Array.isArray(data) ? data : [];
-  return plans.find(plan => String(plan.id) === String(planId)) || null;
-}
-
-// Actualiza o crea el email de contacto del cliente en ISPCube
 async function updateCustomerEmail(customer, email) {
-  const token = await getToken();
-  const id = parseInt(customer.id, 10);
+  requirePortalApiBase();
 
-  // Si ya tiene email, usamos su id para editarlo. Si no, -1 para crear uno nuevo.
-  const existingEmail = customer.contact_emails?.[0];
-  const emailId = existingEmail?.id ? parseInt(existingEmail.id, 10) : -1;
-
-  const body = {
-    id,
-    doc_number:             customer.doc_number,
-    identification_type_id: customer.identification_type_id || 1,
-    entity_id:              customer.entity_id,
-    email: [{ id: emailId, email, principal: 1 }],
-  };
-
-  const res = await fetch(`${API_BASE}/customers/${id}`, {
+  const res = await fetch(`${PORTAL_API_BASE}/customers/${customer.doc_number}/email`, {
     method: "PUT",
     headers: {
-      "Content-Type":  "application/json",
-      "Accept":        "application/json",
-      "api-key":       API_KEY,
-      "client-id":     CLIENT_ID,
-      "login-type":    "api",
-      "username":      API_USER,
-      "Authorization": `Bearer ${token}`,
+      "Content-Type": "application/json",
+      Accept: "application/json",
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ email }),
   });
 
-  const responseText = await res.text();
-
-  if (!res.ok) throw new Error(responseText || `Error ${res.status}`);
-
-  // ISPCube puede devolver 200 con "Ok, with errors" — lo tratamos como éxito
-  // ya que los otros campos (doc_number, entity_id) se actualizan correctamente
-  return true;
+  const data = await readPortalJson(res);
+  return data.customer;
 }
-
-
 const formatMoney = (val) =>
   new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", minimumFractionDigits: 2 }).format(parseFloat(val) || 0);
 
@@ -411,43 +223,6 @@ function WhatsAppIcon({ size = 20 }) {
   );
 }
 
-async function fetchCustomerPlanInfo(customer) {
-  const connection = await fetchCustomerConnection(customer);
-  const plan = await fetchPlanById(connection?.plan_id);
-  return getConnectionPlanInfo(connection, plan);
-}
-
-async function fetchCustomerSummaryByDNI(dni) {
-  if (PORTAL_API_BASE) {
-    try {
-      const res = await fetch(`${PORTAL_API_BASE}/customer-summary?dni=${dni}`, {
-        method: "GET",
-        headers: { "Accept": "application/json" },
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data?.customer?.id) {
-          const planInfo = data.planInfo || await fetchCustomerPlanInfo(data.customer).catch(() => getConnectionPlanInfo(null));
-          return {
-            customer: data.customer,
-            invoiceUrl: data.invoiceUrl || null,
-            planInfo,
-          };
-        }
-      }
-    } catch (err) {
-      console.warn("Fallo endpoint agregado, uso fallback directo a ISP:", err);
-    }
-  }
-
-  const customer = await fetchCustomerByDNI(dni);
-  const invoiceUrl = await fetchLastInvoiceUrl(customer).catch(() => null);
-  const planInfo = await fetchCustomerPlanInfo(customer).catch(() => getConnectionPlanInfo(null));
-  return { customer, invoiceUrl, planInfo };
-}
-
-// ─── LOGIN ─────────────────────────────────────────────────────────────────
 function LoginScreen({ onLogin }) {
   const [dni, setDni] = useState("");
   const [loading, setLoading] = useState(false);
@@ -616,19 +391,8 @@ function EmailCard({ customer, onUpdateCustomer }) {
     setErrorMsg("");
     setStatus("saving");
     try {
-      await updateCustomerEmail(customer, email.trim());
+      const updatedCustomer = await updateCustomerEmail(customer, email.trim());
       setStatus("ok");
-
-      // Actualizar el objeto customer con el nuevo email sin perder la sesión
-      const existingId = customer.contact_emails?.[0]?.id;
-      const updatedCustomer = {
-        ...customer,
-        contact_emails: [{
-          id:    existingId || -1,
-          email: email.trim(),
-          principal: 1,
-        }],
-      };
       onUpdateCustomer(updatedCustomer);
 
       setTimeout(() => setStatus(null), 3500);
@@ -737,8 +501,8 @@ function EmailCard({ customer, onUpdateCustomer }) {
 // ─── PERFIL ────────────────────────────────────────────────────────────────
 function ProfileScreen({ customer, invoiceUrl: initialInvoiceUrl, planInfo: initialPlanInfo, onLogout, onUpdateCustomer }) {
   const [copied, setCopied] = useState(null);
-  const [invoiceUrl, setInvoiceUrl] = useState(initialInvoiceUrl || null);
-  const [invoiceLoading, setInvoiceLoading] = useState(!initialInvoiceUrl);
+  const invoiceUrl = initialInvoiceUrl || null;
+  const invoiceLoading = false;
 
   const debt = parseFloat(customer.debt) || 0;
   const dueDebt = parseFloat(customer.duedebt) || 0;
@@ -747,16 +511,6 @@ function ProfileScreen({ customer, invoiceUrl: initialInvoiceUrl, planInfo: init
   const recargo = svcStatus.suspended ? RECARGO_RECONEXION : 0;
   const totalDebt = debt + recargo;
   const hasDebt = totalDebt > 0;
-
-  // Si no vino factura desde el endpoint agregado, la buscamos en fallback.
-  useEffect(() => {
-    if (initialInvoiceUrl) return;
-
-    fetchLastInvoiceUrl(customer)
-      .then(url => setInvoiceUrl(url))
-      .catch(err => { console.warn("Factura no disponible:", err); setInvoiceUrl(null); })
-      .finally(() => setInvoiceLoading(false));
-  }, [customer, initialInvoiceUrl]);
 
   const debtColor = !hasDebt ? "#10b981" : totalDebt > 5000 ? "#ef4444" : "#f59e0b";
   const debtBg    = !hasDebt ? "rgba(16,185,129,0.12)" : totalDebt > 5000 ? "rgba(239,68,68,0.12)" : "rgba(245,158,11,0.12)";

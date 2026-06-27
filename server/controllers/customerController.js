@@ -22,5 +22,26 @@ export function createCustomerController({ customerSummaryService }) {
     }
   }
 
-  return { getCustomerSummary };
+  async function updateCustomerEmail(req, res) {
+    if (!validateIspConfig()) {
+      return res.status(500).json({
+        error: "Faltan variables ISP_API_KEY/ISP_CLIENT_ID/ISP_API_USER/ISP_API_PASS",
+      });
+    }
+
+    try {
+      const result = await customerSummaryService.updateEmail(req.params.dni, req.body?.email);
+
+      if (result.error) {
+        return res.status(result.status).json({ error: result.error });
+      }
+
+      return res.status(result.status).json(result.data);
+    } catch (error) {
+      console.error("Error en updateCustomerEmail:", error);
+      return res.status(502).json({ error: "fallo actualizacion ISP" });
+    }
+  }
+
+  return { getCustomerSummary, updateCustomerEmail };
 }

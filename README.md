@@ -21,7 +21,7 @@ Portal web para que los clientes del ISP puedan consultar su estado de cuenta, d
 ## Tecnologías
 
 - React 19 + Vite
-- Node.js + Express para endpoint agregado
+- Node.js + Netlify Functions para endpoint agregado (`/api/*`)
 - Redis (opcional, con fallback en memoria)
 - API ISPCube (`https://online25.ispcube.com/api`)
 
@@ -54,9 +54,9 @@ npm run dev
 
 ## Reducción de requests al ISP (cache + endpoint agregado)
 
-Se agregó un backend intermedio en `server/index.js` con endpoint:
+Se agrego un backend intermedio en Netlify Functions con endpoint:
 
-- `GET /customer-summary?dni=12345678`
+- `GET /api/customer-summary?dni=12345678`
 
 Ese endpoint:
 
@@ -76,7 +76,7 @@ Ejemplo de respuesta:
 }
 ```
 
-El frontend ahora usa `VITE_PORTAL_API_BASE` para llamar ese endpoint agregado y, si falla, hace fallback al flujo anterior directo al ISP.
+El frontend usa `VITE_PORTAL_API_BASE` para llamar al backend agregado. En Netlify queda configurado como `/api` desde `netlify.toml`. Las credenciales de ISPCube no deben estar en el bundle publico.
 
 
 ## Estructura backend (Controller / Service / Repository)
@@ -98,40 +98,57 @@ Flujo actual para `GET /customer-summary`:
 4. Repository -> llamadas a ISPCube
 5. Service devuelve payload y controller responde HTTP
 
-## Deploy
+## Deploy en Netlify
+
+El proyecto ya incluye `netlify.toml`:
+
+- Build command: `npm run build`
+- Publish directory: `dist`
+- Functions directory: `netlify/functions`
+- Redirect interno: `/api/*` -> `/.netlify/functions/api/:splat`
+
+En Netlify no subas el archivo `.env`. Carga estas variables en **Site configuration -> Environment variables**:
 
 ```bash
-# Generar build de producción
-npm run build
-
-# La carpeta dist/ contiene los archivos listos para subir al servidor
+CORS_ORIGIN=https://tu-sitio.netlify.app
+CACHE_TTL_SECONDS=120
+TOKEN_TTL_SECONDS=600
+REQUEST_TIMEOUT_MS=12000
+BODY_LIMIT=25kb
+RATE_LIMIT_WINDOW_MS=60000
+RATE_LIMIT_MAX=30
+ISP_API_BASE=https://online25.ispcube.com/api
+ISP_API_KEY=
+ISP_CLIENT_ID=302
+ISP_API_USER=
+ISP_API_PASS=
 ```
 
-Subir el contenido de `dist/` a cualquier hosting estático:
-- **Netlify** — arrastrar la carpeta `dist/` en netlify.com/drop
-- **Vercel** — conectar el repo y hace deploy automático
-- **Servidor propio** — copiar `dist/` a `/var/www/html` o equivalente
+`VITE_PORTAL_API_BASE` no hace falta cargarlo si usas este `netlify.toml`, porque queda seteado en `/api` durante el build.
 
----
+Para desarrollo local con el servidor Express:
 
-## Configuración de la API
+```bash
+npm run server
+npm run dev
+```
+## Configuracion de la API
 
-Las credenciales están al inicio de `App.jsx`:
+Las credenciales viven en `.env` y son leidas solo por el backend:
 
-```js
-const API_BASE  = "https://online25.ispcube.com/api";
-const API_KEY   = "...";
-const CLIENT_ID = "302";
-const API_USER  = "...";
-const API_PASS  = "...";
+```bash
+ISP_API_BASE=https://online25.ispcube.com/api
+ISP_API_KEY=
+ISP_CLIENT_ID=302
+ISP_API_USER=
+ISP_API_PASS=
 ```
 
-El portal usa autenticación en dos pasos:
-1. POST `/sanctum/token` → obtiene Bearer token
-2. GET `/customer?doc_number={dni}` → trae los datos del cliente
+El portal usa autenticacion en dos pasos desde el servidor:
+1. POST `/sanctum/token` -> obtiene Bearer token
+2. GET `/customer?doc_number={dni}` -> trae los datos del cliente
 
-El token se cachea en memoria durante la sesión. Si expira, se le indica al usuario que recargue la página.
-
+El token se cachea en Redis o memoria del servidor durante `TOKEN_TTL_SECONDS`. En Netlify, si no configuras un Redis externo, se usa memoria por instancia warm de Function.
 ---
 
 ## Estructura del proyecto
@@ -160,6 +177,6 @@ orinet-portal/
 
 ## Notas
 
-- La app requiere que el servidor de la API tenga **CORS habilitado** para el dominio desde donde se sirve el portal.
-- El campo `last_invoice_url` debe venir en la respuesta de la API para que funcione el botón de descarga de factura.
-- El CBU se lee del campo `customer_cbu[0]` de la API. Si viene vacío, solo se muestra el alias fijo.
+- El backend debe tener `CORS_ORIGIN` configurado con el dominio real del frontend en produccion.
+- El CBU se lee del campo `customer_cbu[0]` de la API. Si viene vacio, solo se muestra el alias fijo.
+- Rotar las credenciales que estuvieron expuestas en el frontend antes de este cambio.

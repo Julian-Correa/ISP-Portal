@@ -1,8 +1,9 @@
 export class IspRepository {
-  constructor({ ispConfig, cache, tokenTtlSeconds }) {
+  constructor({ ispConfig, cache, tokenTtlSeconds, requestTimeoutMs }) {
     this.isp = ispConfig;
     this.cache = cache;
     this.tokenTtlSeconds = tokenTtlSeconds;
+    this.requestTimeoutMs = requestTimeoutMs;
   }
 
   headers(token) {
@@ -24,7 +25,7 @@ export class IspRepository {
     const cached = await this.cache.get(cacheKey);
     if (cached?.token) return cached.token;
 
-    const response = await fetch(`${this.isp.apiBase}/sanctum/token`, {
+    const response = await this.request(`${this.isp.apiBase}/sanctum/token`, {
       method: "POST",
       headers: this.headers(),
       body: JSON.stringify({ username: this.isp.apiUser, password: this.isp.apiPass }),
@@ -45,7 +46,7 @@ export class IspRepository {
 
   async findCustomerByDni(dni, token) {
     const url = `${this.isp.apiBase}/customer?doc_number=${dni}&deleted=false&temporary=false`;
-    const response = await fetch(url, { headers: this.headers(token) });
+    const response = await this.request(url, { headers: this.headers(token) });
 
     if (response.status === 404) return null;
     if (!response.ok) {
@@ -65,7 +66,7 @@ export class IspRepository {
       canceled: "false",
     });
 
-    const response = await fetch(`${this.isp.apiBase}/bills/last_bill_api?${params}`, {
+    const response = await this.request(`${this.isp.apiBase}/bills/last_bill_api?${params}`, {
       headers: this.headers(token),
     });
 
@@ -114,7 +115,7 @@ export class IspRepository {
         Object.entries(search).filter(([, value]) => value)
       );
 
-      const response = await fetch(`${this.isp.apiBase}/connection?${params}`, {
+      const response = await this.request(`${this.isp.apiBase}/connection?${params}`, {
         headers: this.headers(token),
       });
 
@@ -132,7 +133,7 @@ export class IspRepository {
   async findPlanById(planId, token) {
     if (!planId) return null;
 
-    const response = await fetch(`${this.isp.apiBase}/plans/plans_list`, {
+    const response = await this.request(`${this.isp.apiBase}/plans/plans_list`, {
       headers: this.headers(token),
     });
 
@@ -141,5 +142,44 @@ export class IspRepository {
     const data = await response.json();
     const plans = Array.isArray(data) ? data : [];
     return plans.find((plan) => String(plan.id) === String(planId)) || null;
+  }
+
+  async updateCustomerEmail(customer, email, token) {
+    const id = Number.parseInt(customer.id, 10);
+    if (!Number.isInteger(id)) throw new Error("ID de cliente invalido");
+
+    const existingEmail = customer.contact_emails?.[0];
+    const emailId = existingEmail?.id ? Number.parseInt(existingEmail.id, 10) : -1;
+    const body = {
+      id,
+      doc_number: customer.doc_number,
+      identification_type_id: customer.identification_type_id || 1,
+      entity_id: customer.entity_id,
+      email: [{ id: Number.isInteger(emailId) ? emailId : -1, email, principal: 1 }],
+    };
+
+    const response = await this.request(`${this.isp.apiBase}/customers/${id}`, {
+      method: "PUT",
+      headers: this.headers(token),
+      body: JSON.stringify(body),
+    });
+
+    const responseText = await response.text();
+    if (!response.ok) {
+      throw new Error(responseText || `Error actualizando email (${response.status})`);
+    }
+
+    return true;
+  }
+
+  async request(url, options = {}) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.requestTimeoutMs);
+
+    try {
+      return await fetch(url, { ...options, signal: controller.signal });
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 }

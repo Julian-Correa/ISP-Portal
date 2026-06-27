@@ -11,7 +11,13 @@ export class CacheClient {
     if (!this.redisUrl) return;
 
     try {
-      this.redis = createClient({ url: this.redisUrl });
+      this.redis = createClient({
+        url: this.redisUrl,
+        socket: {
+          connectTimeout: 1000,
+          reconnectStrategy: false,
+        },
+      });
       this.redis.on("error", (err) => {
         console.warn("Redis no disponible, se usa caché en memoria:", err.message);
       });
@@ -54,6 +60,14 @@ export class CacheClient {
       return;
     }
     this.setMemory(key, value, ttlSeconds);
+  }
+
+  async delete(key) {
+    if (this.redis) {
+      await this.redis.del(key);
+      return;
+    }
+    this.memory.delete(key);
   }
 
   isRedisEnabled() {
