@@ -48,24 +48,39 @@ export class CacheClient {
 
   async get(key) {
     if (this.redis) {
-      const value = await this.redis.get(key);
-      return value ? JSON.parse(value) : null;
+      try {
+        const value = await this.redis.get(key);
+        return value ? JSON.parse(value) : null;
+      } catch (error) {
+        console.warn("Redis get fallo, se usa cache en memoria:", error.message);
+        this.redis = null;
+      }
     }
     return this.getMemory(key);
   }
 
   async set(key, value, ttlSeconds) {
     if (this.redis) {
-      await this.redis.setEx(key, ttlSeconds, JSON.stringify(value));
-      return;
+      try {
+        await this.redis.setEx(key, ttlSeconds, JSON.stringify(value));
+        return;
+      } catch (error) {
+        console.warn("Redis set fallo, se usa cache en memoria:", error.message);
+        this.redis = null;
+      }
     }
     this.setMemory(key, value, ttlSeconds);
   }
 
   async delete(key) {
     if (this.redis) {
-      await this.redis.del(key);
-      return;
+      try {
+        await this.redis.del(key);
+        return;
+      } catch (error) {
+        console.warn("Redis delete fallo, se usa cache en memoria:", error.message);
+        this.redis = null;
+      }
     }
     this.memory.delete(key);
   }

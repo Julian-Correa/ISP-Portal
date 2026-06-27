@@ -8,6 +8,14 @@ const rateLimitBuckets = new Map();
 let servicePromise;
 let cache;
 
+function log(level, event, details = {}) {
+  const payload = {
+    event,
+    ...details,
+  };
+  console[level]?.(JSON.stringify(payload));
+}
+
 function corsHeaders(origin) {
   const allowedOrigin = env.corsOrigin === "*" ? "*" : env.corsOrigin || origin || "*";
 
@@ -26,15 +34,16 @@ function json(statusCode, body, headers = {}) {
   return {
     statusCode,
     headers,
-    body: JSON.stringify(body),
+    body: JSON.stringify(body ?? {}),
   };
 }
 
 function getClientIp(event) {
+  const headers = event.headers || {};
   return (
-    event.headers["x-nf-client-connection-ip"] ||
-    event.headers["client-ip"] ||
-    event.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
+    headers["x-nf-client-connection-ip"] ||
+    headers["client-ip"] ||
+    headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
     "unknown"
   );
 }
@@ -67,6 +76,11 @@ async function getCustomerSummaryService() {
         cache,
         tokenTtlSeconds: env.tokenTtlSeconds,
         requestTimeoutMs: env.requestTimeoutMs,
+        logger: {
+          info: (message) => console.info(message),
+          warn: (message) => console.warn(message),
+          error: (message) => console.error(message),
+        },
       });
 
       return new CustomerSummaryService({
@@ -96,42 +110,63 @@ function parseBody(event) {
   return JSON.parse(rawBody);
 }
 
-export async function handler(event) {
-  const headers = corsHeaders(event.headers.origin);
-
-  if (event.httpMethod === "OPTIONS") {
-    return { statusCode: 204, headers, body: "" };
-  }
-
+export async function handler(event = {}) {
+  const startedAt = Date.now();
+  const requestHeaders = event.headers || {};
+  const headers = corsHeaders(requestHeaders.origin);
   const routePath = getRoutePath(event);
+  const method = event.httpMethod || "GET";
 
-  if (routePath === "/health" && event.httpMethod === "GET") {
-    const customerSummaryService = await getCustomerSummaryService();
-    return json(200, {
-      ok: true,
-      redis: customerSummaryService.cache.isRedisEnabled(),
-    }, headers);
-  }
-
-  if (!validateIspConfig()) {
-    return json(500, {
-      error: "Faltan variables ISP_API_KEY/ISP_CLIENT_ID/ISP_API_USER/ISP_API_PASS",
-    }, headers);
-  }
-
-  if (rateLimit(event)) {
-    return json(429, { error: "demasiadas solicitudes" }, headers);
-  }
+  log("info", "api_request", {
+    method,
+    routePath,
+    query: event.queryStringParameters || {},
+  });
 
   try {
-    const customerSummaryService = await getCustomerSummaryService();
+    if (method === "OPTIONS") {
+      return { statusCode: 204, headers, body: "" };
+    }
 
-    if (routePath === "/customer-summary" && event.httpMethod === "GET") {
-      const result = await customerSummaryService.getSummaryByDni(
-        event.queryStringParameters?.dni
-      );
+    if (routePath === "/health" && method === "GET") {
+      const customerSummaryService = await getCustomerSummaryService();
+      return json(200, {
+        ok: true,
+        redis: customerSummaryService.cache.isRedisEnabled(),
+      }, headers);
+    }
 
-      if (result.error) return json(result.status, { error: result.error }, headers);
+    if (rateLimit(event)) {
+      return json(429, { error: "demasiadas solicitudes" }, headers);
+    }
+
+    if (routePath === "/customer-summary" && method === "GET") {
+      const dni = event.queryStringParameters?.dni;
+      const cleanDni = String(dni || "").replace(/\D/g, "");
+      if (cleanDni.length < 7 || cleanDni.length > 8) {
+        return json(400, { error: "dni invalido" }, headers);
+      }
+
+      const configError = validateServerConfig(headers);
+      if (configError) return configError;
+
+      const customerSummaryService = await getCustomerSummaryService();
+      const result = await customerSummaryService.getSummaryByDni(dni);
+
+      if (result.error) {
+        log("warn", "api_customer_summary_error", {
+          dni: cleanDni,
+          status: result.status,
+          error: result.error,
+        });
+        return json(result.status, { error: result.error }, headers);
+      }
+
+      log("info", "api_customer_summary_ok", {
+        dni: cleanDni,
+        cacheStatus: result.cacheStatus,
+        durationMs: Date.now() - startedAt,
+      });
 
       return json(result.status, result.data, {
         ...headers,
@@ -140,23 +175,51 @@ export async function handler(event) {
     }
 
     const emailMatch = routePath.match(/^\/customers\/([^/]+)\/email$/);
-    if (emailMatch && event.httpMethod === "PUT") {
+    if (emailMatch && method === "PUT") {
       let body;
       try {
         body = parseBody(event);
-      } catch {
+      } catch (error) {
+        log("warn", "api_invalid_json_body", { routePath, message: error.message });
         return json(400, { error: "json invalido" }, headers);
       }
+
+      const configError = validateServerConfig(headers);
+      if (configError) return configError;
+
+      const customerSummaryService = await getCustomerSummaryService();
       const result = await customerSummaryService.updateEmail(emailMatch[1], body.email);
 
-      if (result.error) return json(result.status, { error: result.error }, headers);
+      if (result.error) {
+        return json(result.status, { error: result.error }, headers);
+      }
 
       return json(result.status, result.data, headers);
     }
 
     return json(404, { error: "ruta no encontrada" }, headers);
   } catch (error) {
-    console.error("Error en Netlify Function api:", error);
-    return json(502, { error: "fallo consulta ISP" }, headers);
+    log("error", "api_unhandled_error", {
+      method,
+      routePath,
+      durationMs: Date.now() - startedAt,
+      message: error.message,
+      stack: error.stack,
+    });
+    return json(500, { error: "error interno del servidor" }, headers);
   }
+}
+
+function validateServerConfig(headers) {
+  if (validateIspConfig()) return null;
+
+  log("error", "api_env_missing", {
+    hasApiBase: Boolean(env.isp.apiBase),
+    hasApiKey: Boolean(env.isp.apiKey),
+    hasClientId: Boolean(env.isp.clientId),
+    hasApiUser: Boolean(env.isp.apiUser),
+    hasApiPass: Boolean(env.isp.apiPass),
+  });
+
+  return json(500, { error: "configuracion incompleta del servidor" }, headers);
 }

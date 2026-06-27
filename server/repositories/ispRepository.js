@@ -1,9 +1,10 @@
 export class IspRepository {
-  constructor({ ispConfig, cache, tokenTtlSeconds, requestTimeoutMs }) {
+  constructor({ ispConfig, cache, tokenTtlSeconds, requestTimeoutMs, logger = console }) {
     this.isp = ispConfig;
     this.cache = cache;
     this.tokenTtlSeconds = tokenTtlSeconds;
     this.requestTimeoutMs = requestTimeoutMs;
+    this.logger = logger;
   }
 
   headers(token) {
@@ -36,9 +37,9 @@ export class IspRepository {
       throw new Error(`No se pudo obtener token ISPCube (${response.status}): ${body}`);
     }
 
-    const data = await response.json();
-    const token = data.token || data.access_token;
-    if (!token) throw new Error("Respuesta de token inválida en ISPCube");
+    const data = await this.readJson(response, "sanctum/token");
+    const token = data?.token || data?.access_token;
+    if (!token) throw new Error("Respuesta de token invalida en ISPCube");
 
     await this.cache.set(cacheKey, { token }, this.tokenTtlSeconds);
     return token;
@@ -54,7 +55,7 @@ export class IspRepository {
       throw new Error(`Error consultando cliente (${response.status}): ${body}`);
     }
 
-    const data = await response.json();
+    const data = await this.readJson(response, "customer");
     if (Array.isArray(data)) return data[0] || null;
     return data?.id ? data : null;
   }
@@ -66,19 +67,21 @@ export class IspRepository {
       canceled: "false",
     });
 
-    const response = await this.request(`${this.isp.apiBase}/bills/last_bill_api?${params}`, {
-      headers: this.headers(token),
-    });
-
-    if (!response.ok) return null;
-
-    const text = (await response.text()).trim();
-    const trimmed = text.replace(/^[[{"']+|[\]}"']+$/g, "");
-    if (trimmed.startsWith("http")) return trimmed;
-
     try {
-      const json = JSON.parse(text);
+      const response = await this.request(`${this.isp.apiBase}/bills/last_bill_api?${params}`, {
+        headers: this.headers(token),
+      });
+
+      if (!response.ok) return null;
+
+      const text = (await response.text()).trim();
+      const trimmed = text.replace(/^[[{"']+|[\]}"']+$/g, "");
+      if (trimmed.startsWith("http")) return trimmed;
+      if (!text) return null;
+
+      const json = this.parseJsonText(text, "bills/last_bill_api");
       if (typeof json === "string" && json.startsWith("http")) return json;
+
       if (Array.isArray(json) && json.length > 0) {
         const first = json[0];
         if (typeof first === "string") return first;
@@ -91,7 +94,8 @@ export class IspRepository {
       if (json && typeof json === "object") {
         return json.url || json.pdf_url || json.link || null;
       }
-    } catch {
+    } catch (error) {
+      this.warn("isp_optional_invoice_failed", { customerId, message: error.message });
       return null;
     }
 
@@ -115,16 +119,24 @@ export class IspRepository {
         Object.entries(search).filter(([, value]) => value)
       );
 
-      const response = await this.request(`${this.isp.apiBase}/connection?${params}`, {
-        headers: this.headers(token),
-      });
+      try {
+        const response = await this.request(`${this.isp.apiBase}/connection?${params}`, {
+          headers: this.headers(token),
+        });
 
-      if (!response.ok) continue;
+        if (!response.ok) continue;
 
-      const data = await response.json();
-      const connections = Array.isArray(data) ? data : data?.id ? [data] : [];
-      const connection = connections.find((item) => item?.plan_id) || connections[0];
-      if (connection) return connection;
+        const data = await this.readJson(response, "connection");
+        const connections = Array.isArray(data) ? data : data?.id ? [data] : [];
+        const connection = connections.find((item) => item?.plan_id) || connections[0];
+        if (connection) return connection;
+      } catch (error) {
+        this.warn("isp_optional_connection_failed", {
+          customerId: customer.id,
+          search,
+          message: error.message,
+        });
+      }
     }
 
     return null;
@@ -133,15 +145,20 @@ export class IspRepository {
   async findPlanById(planId, token) {
     if (!planId) return null;
 
-    const response = await this.request(`${this.isp.apiBase}/plans/plans_list`, {
-      headers: this.headers(token),
-    });
+    try {
+      const response = await this.request(`${this.isp.apiBase}/plans/plans_list`, {
+        headers: this.headers(token),
+      });
 
-    if (!response.ok) return null;
+      if (!response.ok) return null;
 
-    const data = await response.json();
-    const plans = Array.isArray(data) ? data : [];
-    return plans.find((plan) => String(plan.id) === String(planId)) || null;
+      const data = await this.readJson(response, "plans/plans_list");
+      const plans = Array.isArray(data) ? data : [];
+      return plans.find((plan) => String(plan.id) === String(planId)) || null;
+    } catch (error) {
+      this.warn("isp_optional_plan_failed", { planId, message: error.message });
+      return null;
+    }
   }
 
   async updateCustomerEmail(customer, email, token) {
@@ -175,11 +192,70 @@ export class IspRepository {
   async request(url, options = {}) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.requestTimeoutMs);
+    const startedAt = Date.now();
+    const method = options.method || "GET";
 
     try {
-      return await fetch(url, { ...options, signal: controller.signal });
+      const response = await fetch(url, { ...options, signal: controller.signal });
+      this.info("isp_request", {
+        method,
+        url: this.redactUrl(url),
+        status: response.status,
+        durationMs: Date.now() - startedAt,
+      });
+      return response;
+    } catch (error) {
+      this.error("isp_request_failed", {
+        method,
+        url: this.redactUrl(url),
+        durationMs: Date.now() - startedAt,
+        message: error.message,
+        stack: error.stack,
+      });
+
+      if (error.name === "AbortError") {
+        throw new Error(`Timeout consultando ISPCube (${method} ${this.redactUrl(url)})`);
+      }
+
+      throw error;
     } finally {
       clearTimeout(timeout);
     }
+  }
+
+  async readJson(response, context) {
+    const text = await response.text();
+    return this.parseJsonText(text, context);
+  }
+
+  parseJsonText(text, context) {
+    if (!text) return null;
+
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error(`Respuesta JSON invalida en ${context}: ${text.slice(0, 180)}`);
+    }
+  }
+
+  redactUrl(url) {
+    try {
+      const parsed = new URL(url);
+      return `${parsed.origin}${parsed.pathname}${parsed.search}`;
+    } catch {
+      return url;
+    }
+  }
+
+  info(event, details) {
+    this.logger.info?.(JSON.stringify({ event, ...details }));
+  }
+
+  warn(event, details) {
+    this.logger.warn?.(JSON.stringify({ event, ...details }));
+  }
+
+  error(event, details) {
+    this.logger.error?.(JSON.stringify({ event, ...details }));
   }
 }

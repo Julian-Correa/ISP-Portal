@@ -54,6 +54,14 @@ const POPUP_CONFIG = {
 // ─── CONFIGURACIÓN DE API ──────────────────────────────────────────────────
 const PORTAL_API_BASE = import.meta.env.VITE_PORTAL_API_BASE || "";
 
+class PortalApiError extends Error {
+  constructor(message, status) {
+    super(message);
+    this.name = "PortalApiError";
+    this.status = status;
+  }
+}
+
 function requirePortalApiBase() {
   if (!PORTAL_API_BASE) {
     throw new Error("Falta configurar VITE_PORTAL_API_BASE.");
@@ -69,7 +77,7 @@ async function readPortalJson(response) {
   }
 
   if (!response.ok) {
-    throw new Error(data?.error || `Error del servidor (${response.status})`);
+    throw new PortalApiError(data?.error || `Error del servidor (${response.status})`, response.status);
   }
 
   return data;
@@ -78,14 +86,20 @@ async function readPortalJson(response) {
 async function fetchCustomerSummaryByDNI(dni) {
   requirePortalApiBase();
 
-  const res = await fetch(`${PORTAL_API_BASE}/customer-summary?dni=${dni}`, {
-    method: "GET",
-    headers: { Accept: "application/json" },
-  });
+  let res;
+  try {
+    res = await fetch(`${PORTAL_API_BASE}/customer-summary?dni=${dni}`, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+    });
+  } catch {
+    throw new PortalApiError("No se pudo conectar con el portal. Intentá nuevamente en unos minutos.", 500);
+  }
+
   const data = await readPortalJson(res);
 
   if (!data?.customer?.id) {
-    throw new Error("No encontramos una cuenta asociada a ese DNI.");
+    throw new PortalApiError("No encontramos una cuenta asociada a ese DNI.", 404);
   }
 
   return {
@@ -108,6 +122,9 @@ async function updateCustomerEmail(customer, email) {
   });
 
   const data = await readPortalJson(res);
+  if (!data?.customer?.id) {
+    throw new PortalApiError("No se pudo actualizar el email.", 500);
+  }
   return data.customer;
 }
 const formatMoney = (val) =>
@@ -240,8 +257,14 @@ function LoginScreen({ onLogin }) {
     try {
       const summary = await fetchCustomerSummaryByDNI(clean);
       onLogin(summary);
-    } catch {
-      setError("No encontramos una cuenta asociada a ese DNI. Verificá e intentá nuevamente.");
+    } catch (err) {
+      if (err instanceof PortalApiError && err.status === 400) {
+        setError("Ingresa un DNI valido (7 u 8 digitos, sin puntos ni espacios).");
+      } else if (err instanceof PortalApiError && err.status === 404) {
+        setError("No encontramos una cuenta asociada a ese DNI. Verifica e intenta nuevamente.");
+      } else {
+        setError("No pudimos consultar tu cuenta en este momento. Intenta nuevamente en unos minutos.");
+      }
     } finally {
       setLoading(false);
     }
