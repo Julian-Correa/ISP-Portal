@@ -25,6 +25,42 @@ export class CustomerSummaryService {
     }).format(parseFloat(value) || 0);
   }
 
+  firstArrayItem(value) {
+    return Array.isArray(value) ? value[0] : null;
+  }
+
+  sanitizeCustomer(customer) {
+    const city = customer?.city && typeof customer.city === "object" ? customer.city : {};
+    const phone = this.firstArrayItem(customer?.phones);
+    const cbu = this.firstArrayItem(customer?.customer_cbu);
+    const email = this.firstArrayItem(customer?.contact_emails);
+
+    return {
+      id: customer?.id,
+      code: customer?.code || "",
+      name: customer?.name || "",
+      doc_number: customer?.doc_number || "",
+      address: customer?.address || "",
+      debt: customer?.debt || "0",
+      duedebt: customer?.duedebt || "0",
+      status: customer?.status || "",
+      city: {
+        name: city.name || "",
+        province: city.province || "",
+      },
+      phones: phone ? [{ number: phone.number || "" }] : [],
+      customer_cbu: cbu ? [{
+        cbu: cbu.cbu || "",
+        number: cbu.number || "",
+      }] : [],
+      contact_emails: email ? [{
+        id: email.id || -1,
+        email: email.email || "",
+        principal: email.principal || 1,
+      }] : [],
+    };
+  }
+
   async getSummaryByDni(rawDni) {
     const dni = this.sanitizeDni(rawDni);
     if (!this.isValidDni(dni)) {
@@ -48,7 +84,7 @@ export class CustomerSummaryService {
     const connection = await this.ispRepository.findConnectionByCustomer(customer, token);
     const plan = await this.ispRepository.findPlanById(connection?.plan_id, token);
     const payload = {
-      customer,
+      customer: this.sanitizeCustomer(customer),
       invoiceUrl,
       planInfo: {
         plan: plan?.name || (connection?.plan_id ? `Plan ${connection.plan_id}` : "No informado"),
@@ -76,14 +112,14 @@ export class CustomerSummaryService {
     await this.ispRepository.updateCustomerEmail(customer, cleanEmail, token);
 
     const existingId = customer.contact_emails?.[0]?.id;
-    const updatedCustomer = {
+    const updatedCustomer = this.sanitizeCustomer({
       ...customer,
       contact_emails: [{
         id: existingId || -1,
         email: cleanEmail,
         principal: 1,
       }],
-    };
+    });
 
     await this.cache.delete(`isp:summary:${dni}`);
 
