@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { env, validateIspConfig } from "../../server/config/env.js";
 import { CacheClient } from "../../server/lib/cache.js";
-import { IspRepository } from "../../server/repositories/ispRepository.js";
+import { IspHttpError, IspRepository } from "../../server/repositories/ispRepository.js";
 import { CustomerSummaryService } from "../../server/services/customerSummaryService.js";
 
 const rateLimitBuckets = new Map();
@@ -211,6 +211,25 @@ export async function handler(event = {}) {
 
     return json(404, { error: "ruta no encontrada" }, headers);
   } catch (error) {
+    if (error instanceof IspHttpError) {
+      log("error", "api_isp_http_error", {
+        method,
+        routePath,
+        durationMs: Date.now() - startedAt,
+        endpoint: error.endpoint,
+        ispStatus: error.status,
+        message: error.message,
+        bodyPreview: String(error.body || "").slice(0, 300),
+        stack: error.stack,
+      });
+
+      return json(500, {
+        error: "error consultando proveedor",
+        code: "ISP_HTTP_ERROR",
+        providerStatus: error.status,
+      }, headers);
+    }
+
     log("error", "api_unhandled_error", {
       method,
       routePath,

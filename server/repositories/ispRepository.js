@@ -1,3 +1,13 @@
+export class IspHttpError extends Error {
+  constructor(message, { status, endpoint, body }) {
+    super(message);
+    this.name = "IspHttpError";
+    this.status = status;
+    this.endpoint = endpoint;
+    this.body = body;
+  }
+}
+
 export class IspRepository {
   constructor({ ispConfig, cache, tokenTtlSeconds, requestTimeoutMs, logger = console }) {
     this.isp = ispConfig;
@@ -26,7 +36,8 @@ export class IspRepository {
     const cached = await this.cache.get(cacheKey);
     if (cached?.token) return cached.token;
 
-    const response = await this.request(`${this.isp.apiBase}/sanctum/token`, {
+    const tokenUrl = `${this.isp.apiBase}/sanctum/token`;
+    const response = await this.request(tokenUrl, {
       method: "POST",
       headers: this.headers(),
       body: JSON.stringify({ username: this.isp.apiUser, password: this.isp.apiPass }),
@@ -34,7 +45,16 @@ export class IspRepository {
 
     if (!response.ok) {
       const body = await response.text();
-      throw new Error(`No se pudo obtener token ISPCube (${response.status}): ${body}`);
+      this.error("isp_token_failed", {
+        status: response.status,
+        bodyPreview: body.slice(0, 300),
+        config: this.configDiagnostics(),
+      });
+      throw new IspHttpError(`No se pudo obtener token ISPCube (${response.status})`, {
+        status: response.status,
+        endpoint: "sanctum/token",
+        body,
+      });
     }
 
     const data = await this.readJson(response, "sanctum/token");
@@ -47,12 +67,23 @@ export class IspRepository {
 
   async findCustomerByDni(dni, token) {
     const url = `${this.isp.apiBase}/customer?doc_number=${dni}&deleted=false&temporary=false`;
-    const response = await this.request(url, { headers: this.headers(token) });
+    let response = await this.request(url, { headers: this.headers(token) });
+
+    if (response.status === 401) {
+      this.warn("isp_customer_token_rejected_retry", { dni });
+      await this.cache.delete("isp:token");
+      const freshToken = await this.getToken();
+      response = await this.request(url, { headers: this.headers(freshToken) });
+    }
 
     if (response.status === 404) return null;
     if (!response.ok) {
       const body = await response.text();
-      throw new Error(`Error consultando cliente (${response.status}): ${body}`);
+      throw new IspHttpError(`Error consultando cliente ISPCube (${response.status})`, {
+        status: response.status,
+        endpoint: "customer",
+        body,
+      });
     }
 
     const data = await this.readJson(response, "customer");
@@ -257,5 +288,15 @@ export class IspRepository {
 
   error(event, details) {
     this.logger.error?.(JSON.stringify({ event, ...details }));
+  }
+
+  configDiagnostics() {
+    return {
+      apiBase: this.isp.apiBase,
+      apiKeyLength: this.isp.apiKey?.length || 0,
+      clientId: this.isp.clientId,
+      apiUserLength: this.isp.apiUser?.length || 0,
+      apiPassLength: this.isp.apiPass?.length || 0,
+    };
   }
 }
