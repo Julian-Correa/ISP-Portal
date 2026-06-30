@@ -45,7 +45,7 @@ const WHATSAPP_SOPORTE_URL = (msg = "") =>
   `https://wa.me/${WHATSAPP_SOPORTE}${msg ? `?text=${encodeURIComponent(msg)}` : ""}`;
 
 const POPUP_CONFIG = {
-  enabled: true,
+  enabled: false,
   imageSrc: "/popups/planes.jpeg",
   alt: "Nuevos precios OriNet Julio 2026",
 };
