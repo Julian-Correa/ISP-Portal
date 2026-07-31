@@ -3,10 +3,11 @@ import { getConnectionPlanInfo } from "../utils/customer.js";
 const PORTAL_API_BASE = import.meta.env.VITE_PORTAL_API_BASE || "";
 
 export class PortalApiError extends Error {
-  constructor(message, status) {
+  constructor(message, status, code = null) {
     super(message);
     this.name = "PortalApiError";
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -26,7 +27,11 @@ async function readPortalJson(response) {
   }
 
   if (!response.ok) {
-    throw new PortalApiError(data?.error || `Error del servidor (${response.status})`, response.status);
+    throw new PortalApiError(
+      data?.error || `Error del servidor (${response.status})`,
+      response.status,
+      data?.code || null
+    );
   }
 
   return data;

@@ -176,6 +176,20 @@ export class IspRepository {
   async findPlanById(planId, token) {
     if (!planId) return null;
 
+    const cacheKey = `isp:plan:${planId}`;
+    const cachedPlan = await this.cache.get(cacheKey);
+    if (cachedPlan?.id) return cachedPlan;
+
+    const plansCacheKey = "isp:plans:list";
+    const cachedPlans = await this.cache.get(plansCacheKey);
+    if (Array.isArray(cachedPlans)) {
+      const cachedMatch = cachedPlans.find((plan) => String(plan.id) === String(planId)) || null;
+      if (cachedMatch) {
+        await this.cache.set(cacheKey, cachedMatch, this.tokenTtlSeconds);
+        return cachedMatch;
+      }
+    }
+
     try {
       const response = await this.request(`${this.isp.apiBase}/plans/plans_list`, {
         headers: this.headers(token),
@@ -185,7 +199,14 @@ export class IspRepository {
 
       const data = await this.readJson(response, "plans/plans_list");
       const plans = Array.isArray(data) ? data : [];
-      return plans.find((plan) => String(plan.id) === String(planId)) || null;
+      await this.cache.set(plansCacheKey, plans, this.tokenTtlSeconds);
+
+      const plan = plans.find((item) => String(item.id) === String(planId)) || null;
+      if (plan) {
+        await this.cache.set(cacheKey, plan, this.tokenTtlSeconds);
+      }
+
+      return plan;
     } catch (error) {
       this.warn("isp_optional_plan_failed", { planId, message: error.message });
       return null;

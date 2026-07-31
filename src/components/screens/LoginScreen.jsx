@@ -29,6 +29,11 @@ export default function LoginScreen({ onLogin }) {
         setError("Ingresa un DNI valido (7 u 8 digitos, sin puntos ni espacios).");
       } else if (requestError instanceof PortalApiError && requestError.status === 404) {
         setError("No encontramos una cuenta asociada a ese DNI. Verifica e intenta nuevamente.");
+      } else if (
+        requestError instanceof PortalApiError
+        && (requestError.status === 504 || requestError.code === "ISP_TIMEOUT")
+      ) {
+        setError("El sistema de facturacion esta demorando mas de lo normal. Intenta nuevamente en unos minutos.");
       } else {
         setError("No pudimos consultar tu cuenta en este momento. Intenta nuevamente en unos minutos.");
       }

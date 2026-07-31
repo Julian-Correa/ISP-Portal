@@ -211,6 +211,21 @@ export async function handler(event = {}) {
 
     return json(404, { error: "ruta no encontrada" }, headers);
   } catch (error) {
+    if (error?.message?.startsWith("Timeout consultando ISPCube")) {
+      log("error", "api_isp_timeout", {
+        method,
+        routePath,
+        durationMs: Date.now() - startedAt,
+        message: error.message,
+        stack: error.stack,
+      });
+
+      return json(504, {
+        error: "timeout consultando proveedor",
+        code: "ISP_TIMEOUT",
+      }, headers);
+    }
+
     if (error instanceof IspHttpError) {
       log("error", "api_isp_http_error", {
         method,

@@ -80,8 +80,10 @@ export class CustomerSummaryService {
       return { error: "cliente no encontrado", status: 404 };
     }
 
-    const invoiceUrl = await this.ispRepository.findLastInvoiceUrl(customer.id, token);
-    const connection = await this.ispRepository.findConnectionByCustomer(customer, token);
+    const [invoiceUrl, connection] = await Promise.all([
+      this.ispRepository.findLastInvoiceUrl(customer.id, token),
+      this.ispRepository.findConnectionByCustomer(customer, token),
+    ]);
     const plan = await this.ispRepository.findPlanById(connection?.plan_id, token);
     const payload = {
       customer: this.sanitizeCustomer(customer),
