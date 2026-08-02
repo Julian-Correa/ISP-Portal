@@ -57,8 +57,6 @@ export default function LoginScreen({ onLogin }) {
         overflow: "hidden",
       }}
     >
-      <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-
       <div style={{ position: "absolute", top: -120, right: -100, width: 500, height: 500, borderRadius: "50%", background: "rgba(0,180,120,0.06)", pointerEvents: "none" }} />
       <div style={{ position: "absolute", bottom: -80, left: -80, width: 360, height: 360, borderRadius: "50%", background: "rgba(120,50,220,0.07)", pointerEvents: "none" }} />
       <div style={{ position: "absolute", top: "40%", left: "10%", width: 200, height: 200, borderRadius: "50%", background: "rgba(30,100,220,0.05)", pointerEvents: "none" }} />

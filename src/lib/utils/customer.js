@@ -1,4 +1,3 @@
-import { CUT_DAY } from "../config/portalConfig.js";
 import { formatMoney } from "./format.js";
 
 export function getServiceStatus(status) {
@@ -39,12 +38,15 @@ export function getServiceStatus(status) {
   };
 }
 
-export function getCutoffDate() {
+export function getCutoffDate(cutDay = 26) {
   const now = new Date();
-  const target = new Date(now.getFullYear(), now.getMonth(), CUT_DAY);
+  const normalizedCutDay = Number.isInteger(cutDay) && cutDay > 0 && cutDay <= 31 ? cutDay : 26;
+  const currentMonthLastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  let target = new Date(now.getFullYear(), now.getMonth(), Math.min(normalizedCutDay, currentMonthLastDay));
 
   if (now >= target) {
-    target.setMonth(target.getMonth() + 1);
+    const nextMonthLastDay = new Date(now.getFullYear(), now.getMonth() + 2, 0).getDate();
+    target = new Date(now.getFullYear(), now.getMonth() + 1, Math.min(normalizedCutDay, nextMonthLastDay));
   }
 
   return target.toLocaleDateString("es-AR", {

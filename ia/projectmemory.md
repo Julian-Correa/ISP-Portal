@@ -2,8 +2,8 @@
 
 - Proyecto: portal de clientes de OriNet.
 - Objetivo actual: permitir consulta por DNI, deuda, factura, plan, datos de pago y actualizacion de email.
-- Frontend: SPA React casi completa en `src/App.jsx`.
-- Backend: proxy a ISPCube con capas claras (`controller -> service -> repository -> cache`).
+- Frontend: SPA React con login y perfil separados, consumiendo reglas de negocio desde backend.
+- Backend: proxy a ISPCube con runtime compartido (`app -> http -> service -> repository -> cache`).
 - Deploy principal pensado para Netlify con function agregada en `/api`.
 
 ## Convenciones importantes
@@ -17,21 +17,28 @@
 ## Hotspots tecnicos
 
 - `src/App.jsx`: archivo grande, mezcla logica, estilos, networking y vistas.
-- `netlify/functions/api.js`: entrada extensa con routing manual y concerns HTTP mezclados.
+- `server/http/apiHandler.js`: concentra routing manual, CORS, rate limit y errores compartidos.
 - Integracion ISPCube: proveedor externo con respuestas potencialmente inestables.
 
 ## Riesgos persistentes
 
 - Seguridad debil por acceso basado solo en DNI.
-- Sin tests automatizados para flujos criticos.
 - Rate limit por instancia y no distribuido.
-- Diferencias potenciales entre runtime local Express y runtime serverless.
+- Dependencia fuerte de un proveedor externo con latencia y formatos no siempre consistentes.
+
+## Riesgos resueltos recientemente
+
+- `.env` ya no forma parte del flujo versionado del proyecto.
+- `CORS_ORIGIN` es obligatorio y no existe fallback a `*`.
+- El PUT de email valida `Origin` explicitamente.
+- Express y Netlify usan el mismo handler HTTP.
+- Hay tests automatizados para service, repository y endpoints.
 
 ## Prioridades razonables a futuro
 
 1. Extraer el frontend en componentes/hooks modulares.
-2. Agregar tests minimos de backend para service/repository boundaries.
-3. Unificar mas la capa HTTP entre Express y Netlify.
+2. Revisar un rate limit distribuido si el trafico crece.
+3. Mejorar observabilidad de errores del proveedor.
 4. Revisar modelo de autenticacion si el portal va a escalar o exponer datos sensibles.
 
 ## Como seguir trabajando

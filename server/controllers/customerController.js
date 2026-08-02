@@ -18,7 +18,7 @@ export function createCustomerController({ customerSummaryService }) {
       return res.set("x-cache", result.cacheStatus).status(result.status).json(result.data);
     } catch (error) {
       console.error("Error en getCustomerSummary:", error);
-      return res.status(502).json({ error: "falló consulta ISP", detail: error.message });
+      return res.status(502).json({ error: "falló consulta ISP" });
     }
   }
 

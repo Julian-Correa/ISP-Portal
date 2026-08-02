@@ -7,25 +7,36 @@ import OriNetLogo from "../layout/OriNetLogo.jsx";
 import EmailCard from "../profile/EmailCard.jsx";
 import {
   LINKEDIN_URL,
-  RECARGO_RECONEXION,
   WHATSAPP_SOPORTE_URL,
   WHATSAPP_URL,
 } from "../../lib/config/portalConfig.js";
 import { getConnectionPlanInfo, getCutoffDate, getServiceStatus } from "../../lib/utils/customer.js";
 import { formatMoney, formatName } from "../../lib/utils/format.js";
 
-export default function ProfileScreen({ customer, invoiceUrl: initialInvoiceUrl, planInfo: initialPlanInfo, onLogout, onUpdateCustomer }) {
+export default function ProfileScreen({
+  customer,
+  invoiceUrl: initialInvoiceUrl,
+  planInfo: initialPlanInfo,
+  recargoReconexion = 2000,
+  recargoSegundoVencimiento = 2000,
+  cutDay = 26,
+  onLogout,
+  onUpdateCustomer,
+}) {
   const [copied, setCopied] = useState(null);
   const invoiceUrl = initialInvoiceUrl || null;
-  const invoiceLoading = false;
 
   const debt = parseFloat(customer.debt) || 0;
   const dueDebt = parseFloat(customer.duedebt) || 0;
   const serviceStatus = getServiceStatus(customer.status);
   const planInfo = initialPlanInfo || getConnectionPlanInfo(null);
-  const recargo = serviceStatus.suspended ? RECARGO_RECONEXION : 0;
-  const totalDebt = debt + recargo;
+  const currentDay = new Date().getDate();
+  const recargo = serviceStatus.suspended ? recargoReconexion : 0;
+  const recargoSegundoVencimientoVisible = debt > 0 && currentDay >= 11 && currentDay <= 25;
+  const recargoSegundoVencimientoTotal = recargoSegundoVencimientoVisible ? recargoSegundoVencimiento : 0;
+  const totalDebt = debt + recargo + recargoSegundoVencimientoTotal;
   const hasDebt = totalDebt > 0;
+  const hasSurchargeBreakdown = recargo > 0 || recargoSegundoVencimientoTotal > 0;
 
   const debtColor = !hasDebt ? "#10b981" : totalDebt > 5000 ? "#ef4444" : "#f59e0b";
   const debtBg = !hasDebt ? "rgba(16,185,129,0.12)" : totalDebt > 5000 ? "rgba(239,68,68,0.12)" : "rgba(245,158,11,0.12)";
@@ -36,7 +47,7 @@ export default function ProfileScreen({ customer, invoiceUrl: initialInvoiceUrl,
   const cbuList = customer.customer_cbu || [];
   const cbu = cbuList[0]?.cbu || cbuList[0]?.number || null;
   const alias = "orinet.isp.internet";
-  const cutoffDate = getCutoffDate();
+  const cutoffDate = hasDebt ? getCutoffDate(cutDay) : null;
 
   const handleCopy = (text, key) => {
     navigator.clipboard.writeText(text).then(() => {
@@ -49,13 +60,11 @@ export default function ProfileScreen({ customer, invoiceUrl: initialInvoiceUrl,
     <div
       style={{
         minHeight: "100vh",
-        background: "linear-gradient(160deg, #0a0f1e 0%, #0d2240 55%, #0a1a35 100%)",
+          background: "linear-gradient(160deg, #0a0f1e 0%, #0d2240 55%, #0a1a35 100%)",
         fontFamily: "'Outfit', sans-serif",
         paddingBottom: 60,
       }}
     >
-      <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-
       <div
         style={{
           background: "rgba(255,255,255,0.03)",
@@ -156,7 +165,7 @@ export default function ProfileScreen({ customer, invoiceUrl: initialInvoiceUrl,
                 {!hasDebt ? "✓ ¡Estás al día! Sin deuda pendiente." : "⚠ Tenés un saldo pendiente de pago."}
               </div>
 
-              {recargo > 0 && (
+              {hasSurchargeBreakdown && (
                 <div
                   style={{
                     marginTop: 18,
@@ -172,10 +181,22 @@ export default function ProfileScreen({ customer, invoiceUrl: initialInvoiceUrl,
                     <span style={{ color: "#cbd5e1", fontSize: 13 }}>Deuda</span>
                     <span style={{ color: "#cbd5e1", fontSize: 13, fontWeight: 600 }}>{formatMoney(debt)}</span>
                   </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", width: "100%", maxWidth: 280 }}>
-                    <span style={{ color: "#f87171", fontSize: 13 }}>Recargo por reconexión</span>
-                    <span style={{ color: "#f87171", fontSize: 13, fontWeight: 600 }}>+ {formatMoney(recargo)}</span>
-                  </div>
+
+                  {recargo > 0 && (
+                    <div style={{ display: "flex", justifyContent: "space-between", width: "100%", maxWidth: 280 }}>
+                      <span style={{ color: "#f87171", fontSize: 13 }}>Recargo por reconexión</span>
+                      <span style={{ color: "#f87171", fontSize: 13, fontWeight: 600 }}>+ {formatMoney(recargo)}</span>
+                    </div>
+                  )}
+
+                  {recargoSegundoVencimientoTotal > 0 && (
+                    <div style={{ display: "flex", justifyContent: "space-between", width: "100%", maxWidth: 280 }}>
+                      <span style={{ color: "#f59e0b", fontSize: 13 }}>Recargo de 2do vencimiento</span>
+                      <span style={{ color: "#f59e0b", fontSize: 13, fontWeight: 600 }}>
+                        + {formatMoney(recargoSegundoVencimientoTotal)}
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -301,14 +322,16 @@ export default function ProfileScreen({ customer, invoiceUrl: initialInvoiceUrl,
                   <span style={{ fontSize: 10 }}>●</span> {serviceStatus.label}
                 </span>
               </div>
-              <div style={{ textAlign: "right" }}>
-                <p style={{ margin: "0 0 2px", color: "#cbd5e1", fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase" }}>
-                  Próxima fecha de corte
-                </p>
-                <p style={{ margin: 0, color: "#cbd5e1", fontSize: 14, fontWeight: 600 }}>
-                  📅 {cutoffDate}
-                </p>
-              </div>
+              {cutoffDate && (
+                <div style={{ textAlign: "right" }}>
+                  <p style={{ margin: "0 0 2px", color: "#cbd5e1", fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase" }}>
+                    Próxima fecha de corte
+                  </p>
+                  <p style={{ margin: 0, color: "#cbd5e1", fontSize: 14, fontWeight: 600 }}>
+                    📅 {cutoffDate}
+                  </p>
+                </div>
+              )}
             </div>
 
             <div
@@ -500,23 +523,7 @@ export default function ProfileScreen({ customer, invoiceUrl: initialInvoiceUrl,
             >
               <p style={{ margin: "0 0 3px", color: "#f8fafc", fontWeight: 700, fontSize: 15 }}>📄 Última factura</p>
               <p style={{ margin: "0 0 14px", color: "#64748b", fontSize: 13 }}>Nº de cliente: {customer.code}</p>
-              {invoiceLoading ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 10, color: "#cbd5e1", fontSize: 14 }}>
-                  <span
-                    style={{
-                      width: 16,
-                      height: 16,
-                      border: "2px solid rgba(255,255,255,0.15)",
-                      borderTop: "2px solid #6366f1",
-                      borderRadius: "50%",
-                      display: "inline-block",
-                      animation: "spin 0.7s linear infinite",
-                      flexShrink: 0,
-                    }}
-                  />
-                  Buscando factura...
-                </div>
-              ) : invoiceUrl ? (
+              {invoiceUrl ? (
                 <a
                   href={invoiceUrl}
                   target="_blank"
@@ -655,7 +662,6 @@ export default function ProfileScreen({ customer, invoiceUrl: initialInvoiceUrl,
           from { opacity: 0; transform: translateY(16px); }
           to   { opacity: 1; transform: translateY(0); }
         }
-        @keyframes spin { to { transform: rotate(360deg); } }
         .profile-grid {
           display: grid;
           grid-template-columns: 1fr 1fr;

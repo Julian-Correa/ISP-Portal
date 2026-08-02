@@ -1,122 +1,61 @@
+# Portal de Clientes - OriNet
 
-# Portal de Clientes — OriNet
+Portal web para que clientes de OriNet consulten su cuenta por DNI, vean deuda, factura, plan, datos de pago y actualicen el email de facturacion.
 
-Portal web para que los clientes del ISP puedan consultar su estado de cuenta, deuda y datos de pago, sin necesidad de contactar a administración.
+## Stack
 
----
+- React 19 + Vite 8
+- Express local + Netlify Functions en produccion
+- Handler HTTP canonico compartido entre Express y Netlify
+- Redis opcional, con fallback en memoria
+- Integracion con ISPCube
 
 ## Funcionalidades
 
-- **Login por DNI** — el cliente ingresa su DNI (7 u 8 dígitos, sin puntos ni espacios)
-- **Saldo a abonar** — muestra la deuda en grande con código de colores (verde / amarillo / rojo)
-- **Estado del servicio** — activo, suspendido o sin servicio, con la próxima fecha de corte
-- **Datos para el pago** — alias `orinet.isp.internet` con botón para copiar al portapapeles
-- **Descarga de factura** — link directo al PDF de la última factura
-- **Datos de la cuenta** — domicilio, localidad, teléfono y código de cliente
-- **Contacto por WhatsApp** — botones directos para enviar comprobante de pago o consultar con administración
-- **Diseño responsive** — dos columnas en PC, una columna en celular
+- Consulta por DNI de 7 u 8 digitos
+- Resumen agregado con cliente, ultima factura y plan
+- Reglas de negocio servidas desde backend: `recargoReconexion`, `recargoSegundoVencimiento`, `cutDay`
+- Actualizacion de email de facturacion
+- Contacto directo por WhatsApp
+- UI responsive para login y perfil
 
----
-
-## Tecnologías
-
-- React 19 + Vite
-- Node.js + Netlify Functions para endpoint agregado (`/api/*`)
-- Redis (opcional, con fallback en memoria)
-- API ISPCube (`https://online25.ispcube.com/api`)
-
----
-
-## Instalación
+## Scripts
 
 ```bash
-# 1. Instalar dependencias
-npm install
-
-# 2. Copiar variables de entorno
-cp .env.example .env
-
-# 3. Completar credenciales ISP_* en .env
-```
-
-### Desarrollo local (frontend + endpoint agregado)
-
-```bash
-# Terminal 1: backend agregado (cache Redis/memoria)
-npm run server
-
-# Terminal 2: frontend
 npm run dev
+npm run server
+npm run lint
+npm test
+npm run build
 ```
 
----
+## Desarrollo local
 
+1. Instalar dependencias: `npm install`
+2. Copiar `.env.example` a `.env`
+3. Completar credenciales `ISP_*`
+4. Levantar backend: `npm run server`
+5. Levantar frontend: `npm run dev`
 
-## Reducción de requests al ISP (cache + endpoint agregado)
+`CORS_ORIGIN` es obligatorio. Si falta, el servidor no inicia.
 
-Se agrego un backend intermedio en Netlify Functions con endpoint:
+## Variables de entorno
 
-- `GET /api/customer-summary?dni=12345678`
-
-Ese endpoint:
-
-1. Obtiene/reutiliza token de ISPCube (cacheado por TTL).
-2. Consulta cliente por DNI.
-3. Consulta última factura del cliente.
-4. Devuelve un único payload para el frontend.
-5. Cachea respuesta por DNI en Redis (`x-cache: HIT/MISS`).
-
-Ejemplo de respuesta:
-
-```json
-{
-  "customer": { "id": 123, "name": "..." },
-  "invoiceUrl": "https://...pdf",
-  "generatedAt": "2026-03-23T12:00:00.000Z"
-}
-```
-
-El frontend usa `VITE_PORTAL_API_BASE` para llamar al backend agregado. En Netlify queda configurado como `/api` desde `netlify.toml`. Las credenciales de ISPCube no deben estar en el bundle publico.
-
-
-## Estructura backend (Controller / Service / Repository)
-
-Para escalar el proxy, el backend quedó separado en capas:
-
-- `server/controllers/`: recibe HTTP, valida entrada/salida y códigos de estado.
-- `server/services/`: orquesta reglas de negocio (cache, flujo de consulta).
-- `server/repositories/`: encapsula acceso a ISPCube (token, customer, factura).
-- `server/lib/`: utilidades técnicas compartidas (cache Redis + memoria).
-- `server/config/`: variables de entorno y validaciones.
-- `server/routes/`: mapeo de endpoints a controllers.
-
-Flujo actual para `GET /customer-summary`:
-
-1. Route -> `customerController.getCustomerSummary`
-2. Controller -> `customerSummaryService.getSummaryByDni`
-3. Service -> cache (`HIT`) o `ispRepository` (`MISS`)
-4. Repository -> llamadas a ISPCube
-5. Service devuelve payload y controller responde HTTP
-
-## Deploy en Netlify
-
-El proyecto ya incluye `netlify.toml`:
-
-- Build command: `npm run build`
-- Publish directory: `dist`
-- Functions directory: `netlify/functions`
-- Redirect interno: `/api/*` -> `/.netlify/functions/api/:splat`
-
-En Netlify no subas el archivo `.env`. Carga estas variables en **Site configuration -> Environment variables**:
+Variables principales del backend:
 
 ```bash
-CORS_ORIGIN=https://tu-sitio.netlify.app
+PORT=8787
+CORS_ORIGIN=http://localhost:5173
+REDIS_URL=redis://localhost:6379
 CACHE_TTL_SECONDS=120
 TOKEN_TTL_SECONDS=600
 REQUEST_TIMEOUT_MS=12000
 BODY_LIMIT=25kb
 RATE_LIMIT_WINDOW_MS=60000
 RATE_LIMIT_MAX=30
+RECARGO_RECONEXION=2000
+RECARGO_SEGUNDO_VENCIMIENTO=2000
+CUT_DAY=26
 ISP_API_BASE=https://online25.ispcube.com/api
 ISP_API_KEY=
 ISP_CLIENT_ID=302
@@ -124,59 +63,64 @@ ISP_API_USER=
 ISP_API_PASS=
 ```
 
-`VITE_PORTAL_API_BASE` no hace falta cargarlo si usas este `netlify.toml`, porque queda seteado en `/api` durante el build.
+`VITE_PORTAL_API_BASE` se usa solo en frontend. En Netlify queda seteada como `/api` desde `netlify.toml`.
 
-Para desarrollo local con el servidor Express:
+## API agregada
 
-```bash
-npm run server
-npm run dev
-```
-## Configuracion de la API
+Endpoints principales:
 
-Las credenciales viven en `.env` y son leidas solo por el backend:
+- `GET /api/customer-summary?dni=12345678`
+- `PUT /api/customers/:dni/email`
+- `GET /api/health`
 
-```bash
-ISP_API_BASE=https://online25.ispcube.com/api
-ISP_API_KEY=
-ISP_CLIENT_ID=302
-ISP_API_USER=
-ISP_API_PASS=
-```
+El payload de `customer-summary` incluye datos del cliente, URL de factura, plan y reglas de negocio consumidas por el frontend.
 
-El portal usa autenticacion en dos pasos desde el servidor:
-1. POST `/sanctum/token` -> obtiene Bearer token
-2. GET `/customer?doc_number={dni}` -> trae los datos del cliente
+El PUT de email valida `Origin` contra `CORS_ORIGIN`. Los errores del proveedor se loguean internamente y responden de forma generica, sin exponer detalles internos.
 
-El token se cachea en Redis o memoria del servidor durante `TOKEN_TTL_SECONDS`. En Netlify, si no configuras un Redis externo, se usa memoria por instancia warm de Function.
----
+## Arquitectura
 
-## Estructura del proyecto
-
-```
-orinet-portal/
-├── src/
-│   └── App.jsx        # Toda la aplicación (login + perfil + logo + API)
-├── index.html         # Entry point — verificar que tenga el meta viewport
-├── vite.config.js
-└── package.json
+```text
+src/
+  components/
+  lib/
+server/
+  app/          # composicion compartida de runtime
+  config/       # entorno y validaciones
+  http/         # handler HTTP canonico
+  lib/          # cache Redis/memoria
+  repositories/ # acceso a ISPCube
+  services/     # reglas de negocio
+netlify/functions/
+  api.js        # entrypoint serverless fino
 ```
 
----
+Flujo actual:
 
-## Personalización rápida
+1. Express o Netlify reciben la request.
+2. Ambos delegan al mismo `server/http/apiHandler.js`.
+3. El handler usa `CustomerSummaryService`.
+4. El service consulta cache y `IspRepository`.
+5. La respuesta vuelve con headers y errores consistentes en ambos runtimes.
 
-| Qué cambiar | Dónde |
-|---|---|
-| Alias de pago | Constante `ALIAS` en `App.jsx` |
-| Número de WhatsApp | Constante `WHATSAPP_NUMBER` |
-| Fecha de corte | Constante `CUT_DAY` |
-| Colores del logo | Gradiente `textGrad` en el componente `OriNetLogo` |
+## Calidad
 
----
+- Tests unitarios para `customerSummaryService` e `ispRepository`
+- Tests de endpoints sobre Express adapter y handler canonico
+- CI en GitHub Actions con `lint`, `test` y `build`
+
+## Deploy en Netlify
+
+`netlify.toml` ya deja configurado:
+
+- build: `npm run build`
+- publish: `dist`
+- functions: `netlify/functions`
+- redirect: `/api/*` -> `/.netlify/functions/api/:splat`
+
+En Netlify no subas `.env`. Carga las variables en la configuracion del sitio.
 
 ## Notas
 
-- El backend debe tener `CORS_ORIGIN` configurado con el dominio real del frontend en produccion.
-- El CBU se lee del campo `customer_cbu[0]` de la API. Si viene vacio, solo se muestra el alias fijo.
-- Rotar las credenciales que estuvieron expuestas en el frontend antes de este cambio.
+- `.env` no debe versionarse.
+- El CBU se toma de `customer_cbu[0]`; si no existe, se muestra solo el alias fijo.
+- El acceso por DNI sin OTP es una decision de negocio vigente para este proyecto.

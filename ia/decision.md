@@ -28,13 +28,31 @@
 
 - Estado: vigente
 - Motivo: reducir logica duplicada del dominio.
-- Consecuencia: la composicion HTTP sigue duplicada entre `server/index.js` y `netlify/functions/api.js`.
+- Consecuencia: el runtime compartido vive en `server/app/` y la capa HTTP canonica vive en `server/http/apiHandler.js`.
 
 ### D-006 - Acceso por DNI sin autenticacion fuerte
 
 - Estado: vigente pero sensible
 - Motivo: simplicidad del portal y bajo costo operativo.
 - Consecuencia: es el riesgo funcional y de privacidad mas importante del sistema actual.
+
+### D-007 - No agregar OTP ni mitigaciones de enumeracion en esta etapa
+
+- Estado: vigente
+- Motivo: el acceso por DNI sin OTP es una decision de negocio explicita para el portal actual.
+- Consecuencia: no se deben proponer OTP por WhatsApp/email ni cambios de enmascaramiento como mejora por defecto para este proyecto.
+
+### D-008 - Netlify handler como fuente canonica de HTTP
+
+- Estado: vigente
+- Motivo: eliminar drift entre runtime local Express y runtime serverless sin sumar dependencias nuevas.
+- Consecuencia: CORS, rate limit, validaciones y manejo de errores viven en un unico handler compartido.
+
+### D-009 - Reglas de cobro configuradas desde backend
+
+- Estado: vigente
+- Motivo: permitir cambiar recargos y dia de corte sin redeploy del frontend.
+- Consecuencia: `customer-summary` ahora expone `recargoReconexion`, `recargoSegundoVencimiento` y `cutDay`.
 
 ## Regla de actualizacion
 

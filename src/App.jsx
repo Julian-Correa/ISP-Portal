@@ -22,8 +22,11 @@ export default function App() {
           <PopupImage config={POPUP_CONFIG} />
           <ProfileScreen
             customer={session.customer}
+            cutDay={session.cutDay}
             invoiceUrl={session.invoiceUrl}
             planInfo={session.planInfo}
+            recargoReconexion={session.recargoReconexion}
+            recargoSegundoVencimiento={session.recargoSegundoVencimiento}
             onUpdateCustomer={updateCustomer}
             onLogout={() => setSession(null)}
           />

@@ -1,8 +1,13 @@
 export class CustomerSummaryService {
-  constructor({ cache, ispRepository, cacheTtlSeconds }) {
+  constructor({ cache, ispRepository, cacheTtlSeconds, billingRules = {} }) {
     this.cache = cache;
     this.ispRepository = ispRepository;
     this.cacheTtlSeconds = cacheTtlSeconds;
+    this.billingRules = {
+      recargoReconexion: Number(billingRules.recargoReconexion ?? 2000),
+      recargoSegundoVencimiento: Number(billingRules.recargoSegundoVencimiento ?? 2000),
+      cutDay: Number(billingRules.cutDay ?? 26),
+    };
   }
 
   sanitizeDni(rawDni) {
@@ -92,6 +97,9 @@ export class CustomerSummaryService {
         plan: plan?.name || (connection?.plan_id ? `Plan ${connection.plan_id}` : "No informado"),
         price: plan?.price ? this.formatMoney(plan.price) : "No informado",
       },
+      recargoReconexion: this.billingRules.recargoReconexion,
+      recargoSegundoVencimiento: this.billingRules.recargoSegundoVencimiento,
+      cutDay: this.billingRules.cutDay,
       generatedAt: new Date().toISOString(),
     };
 

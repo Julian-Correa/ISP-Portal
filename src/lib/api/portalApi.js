@@ -1,6 +1,11 @@
 import { getConnectionPlanInfo } from "../utils/customer.js";
 
 const PORTAL_API_BASE = import.meta.env.VITE_PORTAL_API_BASE || "";
+const DEFAULT_BILLING_RULES = {
+  recargoReconexion: 2000,
+  recargoSegundoVencimiento: 2000,
+  cutDay: 26,
+};
 
 export class PortalApiError extends Error {
   constructor(message, status, code = null) {
@@ -61,20 +66,35 @@ export async function fetchCustomerSummaryByDNI(dni) {
     customer: data.customer,
     invoiceUrl: data.invoiceUrl || null,
     planInfo: data.planInfo || getConnectionPlanInfo(null),
+    recargoReconexion: Number(data?.recargoReconexion ?? DEFAULT_BILLING_RULES.recargoReconexion),
+    recargoSegundoVencimiento: Number(
+      data?.recargoSegundoVencimiento ?? DEFAULT_BILLING_RULES.recargoSegundoVencimiento
+    ),
+    cutDay: Number(data?.cutDay ?? DEFAULT_BILLING_RULES.cutDay),
   };
 }
 
 export async function updateCustomerEmail(customer, email) {
   requirePortalApiBase();
 
-  const response = await fetch(`${PORTAL_API_BASE}/customers/${customer.doc_number}/email`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({ email }),
-  });
+  let response;
+
+  try {
+    response = await fetch(`${PORTAL_API_BASE}/customers/${customer.doc_number}/email`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({ email }),
+    });
+  } catch {
+    throw new PortalApiError(
+      "No se pudo conectar con el portal para guardar el email. Revisá tu conexión e intentá nuevamente.",
+      500,
+      "NETWORK_ERROR"
+    );
+  }
 
   const data = await readPortalJson(response);
 

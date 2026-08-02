@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { updateCustomerEmail } from "../../lib/api/portalApi.js";
+import { PortalApiError, updateCustomerEmail } from "../../lib/api/portalApi.js";
 
 export default function EmailCard({ customer, onUpdateCustomer }) {
   const existingEmail = customer.contact_emails?.[0]?.email || "";
@@ -32,9 +32,20 @@ export default function EmailCard({ customer, onUpdateCustomer }) {
       setStatus("ok");
       onUpdateCustomer(updatedCustomer);
       setTimeout(() => setStatus(null), 3500);
-    } catch {
+    } catch (requestError) {
       setStatus("error");
-      setErrorMsg("No se pudo guardar. Intentá de nuevo.");
+
+      if (requestError instanceof PortalApiError && requestError.status === 400) {
+        setErrorMsg("El email no es valido.");
+        return;
+      }
+
+      if (requestError instanceof PortalApiError && requestError.code === "NETWORK_ERROR") {
+        setErrorMsg("No pudimos conectar con el portal. Revisá tu internet e intentá nuevamente.");
+        return;
+      }
+
+      setErrorMsg("No se pudo guardar el email. Intentá de nuevo en unos minutos.");
     }
   };
 

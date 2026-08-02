@@ -1,6 +1,3 @@
-export const CUT_DAY = 26;
-export const RECARGO_RECONEXION = 2000;
-
 export const WHATSAPP_NUMBER = "541130921454";
 export const WHATSAPP_SOPORTE = "541171812782";
 export const LINKEDIN_URL = "https://www.linkedin.com/in/correa-julian/";
